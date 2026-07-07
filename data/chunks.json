@@ -1,0 +1,42 @@
+[
+    {
+        "type": "FunctionDef",
+        "name": "hello",
+        "file_path": "sample_repo\\app.py",
+        "start_line": 1,
+        "end_line": 3,
+        "code": "def hello(name,age):\n  \"\"\"Greets a person with their name and age.\"\"\"\n  print(\"Hello, World!\")",
+        "parameters": [
+            "name",
+            "age"
+        ],
+        "docstring": "Greets a person with their name and age.",
+        "parent_class": null
+    },
+    {
+        "type": "ClassDef",
+        "name": "User",
+        "file_path": "sample_repo\\models.py",
+        "start_line": 1,
+        "end_line": 4,
+        "code": "class User:\n  def login(self, username, password):\n    \"\"\"Implement login logic here.\"\"\"\n    pass",
+        "parameters": [],
+        "docstring": null,
+        "parent_class": null
+    },
+    {
+        "type": "FunctionDef",
+        "name": "login",
+        "file_path": "sample_repo\\models.py",
+        "start_line": 2,
+        "end_line": 4,
+        "code": "  def login(self, username, password):\n    \"\"\"Implement login logic here.\"\"\"\n    pass",
+        "parameters": [
+            "self",
+            "username",
+            "password"
+        ],
+        "docstring": "Implement login logic here.",
+        "parent_class": "User"
+    }
+]
