@@ -1,32 +1,115 @@
-# Codebase RAG System
+# 🚀 Codebase RAG System
 
-A simple Python project for exploring codebases and preparing them for retrieval-augmented generation (RAG) workflows.
+An AI-powered Codebase Retrieval-Augmented Generation (RAG) System that understands Python repositories using Abstract Syntax Trees (AST), semantic chunking, embeddings, and vector search.
+This project indexes source code into a vector database, enabling semantic code search and laying the foundation for an intelligent AI coding assistant.
 
-## Project Goal
-This project focuses on reading Python source files, parsing their structure, and extracting useful code information such as classes and functions for downstream search and reasoning systems.
+## ✨ Features
 
-## Day 1 (Yesterday)
-- Initialized the project structure and created the main package layout.
-- Added a sample repository under the sample_repo folder for testing.
-- Implemented core ingestion modules to discover Python files and read their contents.
-- Built the AST parser to extract Python classes and functions from source code.
+- 📂 Recursively loads Python source files
+- 🌳 Parses source code using Python AST
+- ✂️ Performs AST-based semantic code chunking
+- 📝 Extracts rich metadata:
+  - Function/Class names
+  - Parameters
+  - Docstrings
+  - Parent Class
+  - Return Types
+  - File Path
+  - Start & End Line Numbers
+- ⚡ Supports asynchronous functions (async def)
+- 🧠 Generates semantic embeddings using Sentence Transformers
+- 🗄️ Stores embeddings and metadata in ChromaDB
+- 🔑 Uses stable chunk IDs to prevent duplicate indexing
 
-## Day 2 (Today)
-- Connected the ingestion and parsing flow in the main entry script.
-- Verified that the system can read Python files, parse them into an AST, and print class/function definitions with their line numbers.
-- Strengthened the project foundation for future RAG-related features such as chunking, embeddings, and retrieval.
+## 🏗️ Current Pipeline
 
-## How to Run
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Run the sample parser:
-   ```bash
-   python main.py
-   ```
+Repository
+      ↓
+Load Python Files
+      ↓
+Read Source Code
+      ↓
+AST Parsing
+      ↓
+Semantic Chunking
+      ↓
+Metadata Extraction
+      ↓
+Embedding Generation
+      ↓
+ChromaDB Storage
+## 📁 Project Structure
 
-## Next Steps
-- Add chunking support for code snippets.
-- Integrate embeddings for semantic retrieval.
-- Build a retrieval layer for querying codebase content.
+Codebase-RAG-System/
+│
+├── data/
+│   ├── chunks.json
+│   └── chroma_db/
+│
+├── sample_repo/
+│
+├── src/
+│   ├── chunking/
+│   ├── embeddings/
+│   ├── ingestion/
+│   ├── parser/
+│   ├── retrieval/
+│   ├── storage/
+│   └── agents/
+│
+├── main.py
+├── test_embedding.py
+├── requirements.txt
+└── README.md
+## 🛠️ Tech Stack
+
+- Python
+- Abstract Syntax Tree (AST)
+- Sentence Transformers
+- ChromaDB
+- JSON
+
+## 🚧 Current Progress
+
+- ✅ Repository Ingestion
+- ✅ AST Parsing
+- ✅ Semantic Chunking
+- ✅ Metadata Extraction
+- ✅ Embedding Generation
+- ✅ ChromaDB Indexing
+- ⏳ Semantic Retrieval
+- ⏳ LLM Integration
+- ⏳ FastAPI Backend
+- ⏳ Frontend
+- ⏳ Deployment
+
+## 🎯 Upcoming Features
+
+- Semantic Code Retrieval
+- AI-powered Code Question Answering
+- RAG Pipeline
+- FastAPI Backend
+- Interactive Frontend
+- Multi-language Support
+- Deployment
+
+## 📌 Learning Goals
+
+This project is being built from scratch to understand the complete lifecycle of a production-grade Codebase RAG System, including:
+
+- AST Parsing
+- Semantic Chunking
+- Embeddings
+- Vector Databases
+- Retrieval
+- Retrieval-Augmented Generation (RAG)
+- Agentic AI
+- Production-ready System Design
+
+## 🤝 Contributing
+
+Suggestions and improvements are welcome. Feel free to open an issue or submit a pull request.
+
+## ⭐ Star the Repository
+
+If you found this project interesting, consider giving it a ⭐ to support the project.

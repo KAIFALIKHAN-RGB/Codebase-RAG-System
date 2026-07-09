@@ -4,6 +4,8 @@ from src.ingestion.reader import read_python_file
 from src.parser.ast_parser import parse_code
 from src.chunking.chunker import extract_chunks
 from src.utils.storage import save_chunks
+from src.storage.chroma_store import store_chunk
+from src.embeddings.embedder import get_embedding
 
 files = load_python_file("sample_repo")
 
@@ -19,20 +21,10 @@ for file in files:
     all_chunks.extend(chunks)
 
 save_chunks(all_chunks, "data/chunks.json")
-print(f"\nSaved {len(all_chunks)} chunks successfully.")
 for chunk in all_chunks:
-       # print("chunk keys:", chunk.keys())
-        print("=" * 60)
-        print(f"Type       : {chunk['type']}")
-        print(f"Name       : {chunk['name']}")
-        print(f"File       : {chunk['file_path']}")
-        print(f"Start Line : {chunk['start_line']}")
-        print(f"End Line   : {chunk['end_line']}")
-        print(f"Parameters : {chunk['parameters']}")
-        print(f"Docstring  : {chunk['docstring']}")
-        print(f"Parent Class: {chunk['parent_class']}")
-        print("\nCode:")
-        print(chunk["code"])
-    # print(ast.dump(tree, indent=4))
+    embedding = get_embedding(chunk["code"])
+    store_chunk(chunk, embedding)
+print(f"\nStored {len(all_chunks)} chunks in ChromaDB successfully.")
 
+    # print(ast.dump(tree, indent=4))
    # print(code)

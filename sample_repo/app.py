@@ -1,3 +1,8 @@
-def hello(name,age):
-  """Greets a person with their name and age."""
-  print("Hello, World!")
+def add(a: int, b: int) -> int:
+    """Adds two numbers."""
+    return a + b
+
+
+async def get_users() -> list:
+    """Returns all users."""
+    return []

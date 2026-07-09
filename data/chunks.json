@@ -1,17 +1,30 @@
 [
     {
         "type": "FunctionDef",
-        "name": "hello",
+        "name": "add",
         "file_path": "sample_repo\\app.py",
         "start_line": 1,
         "end_line": 3,
-        "code": "def hello(name,age):\n  \"\"\"Greets a person with their name and age.\"\"\"\n  print(\"Hello, World!\")",
+        "code": "def add(a: int, b: int) -> int:\n    \"\"\"Adds two numbers.\"\"\"\n    return a + b",
         "parameters": [
-            "name",
-            "age"
+            "a",
+            "b"
         ],
-        "docstring": "Greets a person with their name and age.",
-        "parent_class": null
+        "docstring": "Adds two numbers.",
+        "parent_class": null,
+        "return_type": "int"
+    },
+    {
+        "type": "AsyncFunctionDef",
+        "name": "get_users",
+        "file_path": "sample_repo\\app.py",
+        "start_line": 6,
+        "end_line": 8,
+        "code": "async def get_users() -> list:\n    \"\"\"Returns all users.\"\"\"\n    return []",
+        "parameters": [],
+        "docstring": "Returns all users.",
+        "parent_class": null,
+        "return_type": "list"
     },
     {
         "type": "ClassDef",
@@ -19,10 +32,35 @@
         "file_path": "sample_repo\\models.py",
         "start_line": 1,
         "end_line": 4,
-        "code": "class User:\n  def login(self, username, password):\n    \"\"\"Implement login logic here.\"\"\"\n    pass",
+        "code": "class User:\n    def login(self, username, password):\n        \"\"\"User login\"\"\"\n        pass",
         "parameters": [],
         "docstring": null,
-        "parent_class": null
+        "parent_class": null,
+        "return_type": null
+    },
+    {
+        "type": "ClassDef",
+        "name": "Admin",
+        "file_path": "sample_repo\\models.py",
+        "start_line": 7,
+        "end_line": 10,
+        "code": "class Admin:\n    def login(self, username, password):\n        \"\"\"Admin login\"\"\"\n        pass",
+        "parameters": [],
+        "docstring": null,
+        "parent_class": null,
+        "return_type": null
+    },
+    {
+        "type": "ClassDef",
+        "name": "Guest",
+        "file_path": "sample_repo\\models.py",
+        "start_line": 13,
+        "end_line": 16,
+        "code": "class Guest:\n    def login(self):\n        \"\"\"Guest login\"\"\"\n        pass",
+        "parameters": [],
+        "docstring": null,
+        "parent_class": null,
+        "return_type": null
     },
     {
         "type": "FunctionDef",
@@ -30,13 +68,44 @@
         "file_path": "sample_repo\\models.py",
         "start_line": 2,
         "end_line": 4,
-        "code": "  def login(self, username, password):\n    \"\"\"Implement login logic here.\"\"\"\n    pass",
+        "code": "    def login(self, username, password):\n        \"\"\"User login\"\"\"\n        pass",
         "parameters": [
             "self",
             "username",
             "password"
         ],
-        "docstring": "Implement login logic here.",
-        "parent_class": "User"
+        "docstring": "User login",
+        "parent_class": "User",
+        "return_type": null
+    },
+    {
+        "type": "FunctionDef",
+        "name": "login",
+        "file_path": "sample_repo\\models.py",
+        "start_line": 8,
+        "end_line": 10,
+        "code": "    def login(self, username, password):\n        \"\"\"Admin login\"\"\"\n        pass",
+        "parameters": [
+            "self",
+            "username",
+            "password"
+        ],
+        "docstring": "Admin login",
+        "parent_class": "Admin",
+        "return_type": null
+    },
+    {
+        "type": "FunctionDef",
+        "name": "login",
+        "file_path": "sample_repo\\models.py",
+        "start_line": 14,
+        "end_line": 16,
+        "code": "    def login(self):\n        \"\"\"Guest login\"\"\"\n        pass",
+        "parameters": [
+            "self"
+        ],
+        "docstring": "Guest login",
+        "parent_class": "Guest",
+        "return_type": null
     }
 ]
