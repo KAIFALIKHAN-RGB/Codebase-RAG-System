@@ -21,6 +21,7 @@ for file in files:
     all_chunks.extend(chunks)
 
 save_chunks(all_chunks, "data/chunks.json")
+
 for chunk in all_chunks:
     embedding = get_embedding(chunk["code"])
     store_chunk(chunk, embedding)
