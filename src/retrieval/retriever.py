@@ -1,4 +1,5 @@
 import time
+import re
 import chromadb
 
 from src.embeddings.embedder import get_embedding
@@ -32,6 +33,9 @@ def search(query, k=3, threshold=30.0):
     # Convert the user's query into an embedding
     query_embedding = get_embedding(query)
 
+    #Normalize query into lowercase words for symbol matching
+    query_words = set(re.findall(r"[a-zA-Z0-9]+", query.lower()))
+
     # Retrieve the top-k nearest code chunks from ChromaDB
     results = collection.query(
         query_embeddings=[query_embedding],
@@ -53,6 +57,15 @@ def search(query, k=3, threshold=30.0):
     ):
         # Convert cosine distance into similarity percentage
         similarity = max(0, (1 - distance) * 100)
+
+        # Get and normalize the code symbol name
+        symbol_name = metadata.get("name", "")
+
+        #Check whether the symbol name appears in the user's query words
+        symbol_words = set(re.findall(r"[a-zA-Z0-9]+", symbol_name.lower().replace("_", " ")))
+
+        if symbol_words and symbol_words.issubset(query_words):
+            similarity += 15  # Boost similarity if symbol matches query
 
         # Skip results below the similarity threshold
         if similarity < threshold:
