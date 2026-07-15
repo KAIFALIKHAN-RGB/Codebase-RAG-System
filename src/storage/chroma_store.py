@@ -20,3 +20,5 @@ def store_chunk(chunk, embedding):
             "return_type": str(chunk["return_type"])
         }]
     )
+def delete_chunks_by_file(file_path):
+        collection.delete(where={"file_path": str(file_path)})          

@@ -13,7 +13,7 @@ try:
     response = search(
         query=query,
         k=3,
-        threshold=50.0
+        threshold=30.0
     )
 
     # Extract results and retrieval time
