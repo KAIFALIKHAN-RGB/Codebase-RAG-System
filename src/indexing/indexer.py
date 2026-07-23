@@ -7,9 +7,11 @@ from src.storage.chroma_store import store_chunk, delete_chunks_by_file
 from src.embeddings.embedder import get_embedding
 from src.utils.file_hash import get_hash_file
 from src.utils.index_state import load_index_state, save_index_state
+import os
 
 
 def index_codebase(repo_path):
+    repository_name = os.path.basename(os.path.normpath(repo_path))
     files = load_python_file(repo_path)
 
     old_state = load_index_state()
@@ -36,7 +38,7 @@ def index_codebase(repo_path):
         if file_key in old_state:
             modified_files_count += 1
             print(f"File modified, removing old chunks : {file}")
-            delete_chunks_by_file(file_key)
+            delete_chunks_by_file(repository_name, file_key)
         else:
             new_files_count += 1
 
@@ -46,7 +48,12 @@ def index_codebase(repo_path):
 
         code = read_python_file(file)
         tree = parse_code(code)
-        chunks = extract_chunks(tree, code, file)
+        chunks = extract_chunks(
+            tree,
+            code,
+            file,
+            repository_name
+            )
         all_chunks.extend(chunks)
 
     deleted_files = set(old_state.keys()) - set(new_state.keys())
@@ -54,7 +61,7 @@ def index_codebase(repo_path):
     for deleted_file in deleted_files:
         deleted_files_count += 1
         print(f"File deleted, removing old chunks : {deleted_file}")
-        delete_chunks_by_file(deleted_file)
+        delete_chunks_by_file(repository_name, deleted_file)
 
     save_chunks(all_chunks, "data/chunks.json")
 

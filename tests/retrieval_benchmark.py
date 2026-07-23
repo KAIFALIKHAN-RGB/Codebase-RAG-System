@@ -9,17 +9,18 @@ from src.rag.pipeline import run_rag_pipeline
 # -------------------------------
 test_cases = [
     {
-        "query": "Tell me about the User class",
-        "expected": "User"
-    },
-    {
-        "query": "How does user login work?",
-        "expected": "login"
-    },
-    {
-        "query": "What is an array?",
-        "expected": None
-    }
+    "query": "How does dotenv load environment variables?",
+    "expected": "dotenv"
+},
+{
+    "query": "What does parser.py do?",
+    "expected": "parser"
+},
+{
+    "query": "What is an array?",
+    "expected": None
+}
+
 ]
 # -------------------------------
 # Run Benchmark

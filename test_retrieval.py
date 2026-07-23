@@ -37,6 +37,7 @@ try:
             print(f"Name: {metadata.get('name', 'N/A')}")
             print(f"Type: {metadata.get('type', 'N/A')}")
             print(f"File: {metadata.get('file_path', 'N/A')}")
+            print
 
             # Display line range if available
             if "start_line" in metadata and "end_line" in metadata:

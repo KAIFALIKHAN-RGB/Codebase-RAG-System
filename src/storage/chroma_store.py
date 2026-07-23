@@ -15,10 +15,18 @@ def store_chunk(chunk, embedding):
             "end_line": chunk["end_line"],
             "parameters": ",".join(chunk["parameters"]) if chunk["parameters"] else "",
             "type": chunk["type"],
+            "repository": chunk["repository"],
             "file_path": chunk["file_path"],
             "parent_class": str(chunk["parent_class"]),
             "return_type": str(chunk["return_type"])
         }]
     )
-def delete_chunks_by_file(file_path):
-        collection.delete(where={"file_path": str(file_path)})          
+def delete_chunks_by_file(repository, file_path):
+        collection.delete(
+    where={
+        "$and": [
+            {"repository": repository},
+            {"file_path": str(file_path)}
+        ]
+    }
+)     

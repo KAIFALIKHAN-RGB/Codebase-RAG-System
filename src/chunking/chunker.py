@@ -1,6 +1,6 @@
 import ast
 
-def extract_chunks(tree, code, file_path):
+def extract_chunks(tree, code, file_path, repository):
     """
     Extracts chunks of code from the AST tree and returns them as a list of dictionaries.
 
@@ -39,6 +39,7 @@ def extract_chunks(tree, code, file_path):
             if hasattr(node, 'returns') and node.returns is not None:
                 return_type = ast.unparse(node.returns)
             chunk = {
+                "repository" : repository,
                 "type" : type(node).__name__,
                 "name" : node.name,
                 "file_path" : str(file_path),
