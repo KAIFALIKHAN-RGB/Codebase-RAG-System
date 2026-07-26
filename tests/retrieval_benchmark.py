@@ -35,7 +35,10 @@ for i, test in enumerate(test_cases, start=1):
     print(f"Query    : {test['query']}")
     print(f"Expected : {test['expected']}")
 
-    result = run_rag_pipeline(test["query"])
+    result = run_rag_pipeline(
+             test["query"],
+             repository="python-dotenv")
+                          
 
     answer = result["answer"]
 

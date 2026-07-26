@@ -12,7 +12,7 @@ client = chromadb.PersistentClient(path="data/chroma_db")
 collection = client.get_collection("code_chunks")
 
 
-def search(query, k=3, threshold=30.0):
+def search(query, repository=None, k=3, threshold=30.0):
     """
     Search the codebase for the most relevant code chunks.
 
@@ -36,10 +36,15 @@ def search(query, k=3, threshold=30.0):
     #Normalize query into lowercase words for symbol matching
     query_words = set(re.findall(r"[a-zA-Z0-9]+", query.lower()))
 
+    where_filter = None
+    if repository is not None:
+        where_filter = {"repository": repository}
+
     # Retrieve the top-k nearest code chunks from ChromaDB
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=k
+        n_results=k,
+        where=where_filter
     )
 
     relevant_results = []

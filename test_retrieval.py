@@ -12,6 +12,7 @@ try:
     # Search the codebase
     response = search(
         query=query,
+        repository="python-dotenv",
         k=3,
         threshold=30.0
     )
