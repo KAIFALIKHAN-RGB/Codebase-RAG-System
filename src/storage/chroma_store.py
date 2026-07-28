@@ -1,10 +1,26 @@
 import chromadb 
+import shutil
+import os
 
-client = chromadb.PersistentClient(path="data/chroma_db")
+client = None
+collection = None
 
-collection = client.get_or_create_collection(name="code_chunks", metadata={"hnsw:space": "cosine"})
+
+def get_collection():
+    global client, collection
+
+    if collection is None:
+        client = chromadb.PersistentClient(path="data/chroma_db")
+
+        collection = client.get_or_create_collection(
+            name="code_chunks",
+            metadata={"hnsw:space": "cosine"}
+        )
+
+    return collection
 
 def store_chunk(chunk, embedding):
+    collection = get_collection()
     collection.upsert(
         ids=[f"{chunk['file_path']}:{chunk['start_line']}:{chunk['end_line']}"],
         documents=[chunk["code"]],
@@ -22,6 +38,7 @@ def store_chunk(chunk, embedding):
         }]
     )
 def delete_chunks_by_file(repository, file_path):
+        collection = get_collection()
         collection.delete(
     where={
         "$and": [
@@ -29,4 +46,13 @@ def delete_chunks_by_file(repository, file_path):
             {"file_path": str(file_path)}
         ]
     }
-)     
+)  
+
+def reset_database():
+    global client, collection
+
+    client = None
+    collection = None
+
+    if os.path.exists("data/chroma_db"):
+        shutil.rmtree("data/chroma_db")

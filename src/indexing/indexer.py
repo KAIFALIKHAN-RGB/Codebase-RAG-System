@@ -3,10 +3,15 @@ from src.ingestion.reader import read_python_file
 from src.parser.ast_parser import parse_code
 from src.chunking.chunker import extract_chunks
 from src.utils.storage import save_chunks
-from src.storage.chroma_store import store_chunk, delete_chunks_by_file
+from src.storage.chroma_store import (store_chunk, delete_chunks_by_file,reset_database)
 from src.embeddings.embedder import get_embedding
 from src.utils.file_hash import get_hash_file
 from src.utils.index_state import load_index_state, save_index_state
+from src.utils.schema_version import (
+    SCHEMA_VERSION,
+    load_schema_version,
+    save_schema_version,
+)
 import os
 
 
@@ -14,7 +19,31 @@ def index_codebase(repo_path):
     repository_name = os.path.basename(os.path.normpath(repo_path))
     files = load_python_file(repo_path)
 
-    old_state = load_index_state()
+    saved_version = load_schema_version()
+
+    if saved_version != SCHEMA_VERSION:
+        print("=" * 60)
+        print("Schema version changed.")
+        print(f"Old Version : {saved_version}")
+        print(f"New Version : {SCHEMA_VERSION}")
+        print("Full re-index required.")
+        print("=" * 60)
+
+        reset_database()
+
+        if os.path.exists("data/index_state.json"):
+            os.remove("data/index_state.json")
+
+        if os.path.exists("data/file_hashes.json"):
+            os.remove("data/file_hashes.json")
+
+        old_state = {}
+
+        save_schema_version()
+
+
+    if saved_version == SCHEMA_VERSION:
+      old_state = load_index_state()
     new_state = {}
 
     all_chunks = []
