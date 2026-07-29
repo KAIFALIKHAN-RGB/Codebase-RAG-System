@@ -8,18 +8,90 @@ from src.rag.pipeline import run_rag_pipeline
 # Benchmark Test Cases
 # -------------------------------
 test_cases = [
-    {
-    "query": "How does dotenv load environment variables?",
-    "expected": "dotenv"
-},
-{
-    "query": "What does parser.py do?",
-    "expected": "parser"
-},
-{
-    "query": "What is an array?",
-    "expected": None
-}
+        {
+            "query": "Where is load_dotenv implemented?",
+            "expected": "load_dotenv"
+        },
+        {
+            "query": "What does cli.py do?",
+            "expected": "cli"
+        },
+        {
+            "query": "Explain parser.py.",
+            "expected": "parser"
+        },
+        {
+            "query": "How are .env files parsed?",
+            "expected": [
+              "parser",
+              "DotEnv",
+              "parse" ]
+                       
+        },
+        {
+            "query": "Which file loads environment variables?",
+            "expected": "dotenv"
+        },
+        {
+            "query": "How does the library read environment variables?",
+            "expected": "dotenv"
+        },
+        {
+            "query": "How is the env file processed?",
+            "expected": ["DotEnv","processed","parser"]
+        },
+        {
+            "query": "Where is command line functionality implemented?",
+            "expected": "cli"
+        },
+        {
+            "query": "How are variables imported from .env?",
+            "expected": "dotenv"
+        },
+        {
+            "query": "Which module is responsible for parsing?",
+            "expected": "parser"
+        },
+        {
+            "query": "What is JWT authentication?",
+            "expected": None
+        },
+        {
+            "query": "How does OAuth work?",
+            "expected": None
+        },
+        {
+            "query": "Explain binary search tree.",
+            "expected": None
+        },
+        {
+            "query": "What is an operating system?",
+            "expected": None
+        },
+        {
+            "query": "How is Redis caching implemented?",
+            "expected": None
+        },
+        {
+            "query": "How is parsing done?",
+            "expected": "parser"
+        },
+        {
+            "query": "Where are variables handled?",
+            "expected": "variables"
+        },
+        {
+            "query": "Which file reads configuration?",
+            "expected": "dotenv"
+        },
+        {
+            "query": "How does the project start?",
+            "expected": "main"
+        },
+        {
+            "query": "How are commands executed?",
+            "expected": "cli"
+        }
 
 ]
 # -------------------------------
@@ -48,7 +120,13 @@ for i, test in enumerate(test_cases, start=1):
     if test["expected"] is None:
         success = "No relevant code chunks found." in answer
     else:
-        success = test["expected"].lower() in answer.lower()
+        if isinstance(test["expected"], list):
+            success = any(
+                keyword.lower() in answer.lower()
+            for keyword in test["expected"]
+        )
+        else:
+            success = test["expected"].lower() in answer.lower()
 
     if success:
         print("\nResult : PASS ✅")
@@ -58,14 +136,20 @@ for i, test in enumerate(test_cases, start=1):
         failed += 1
 
 print("\n" + "=" * 60)
-print("Benchmark Summary")
+print("FINAL RETRIEVAL REPORT")
 print("=" * 60)
 
-print(f"Total Tests : {len(test_cases)}")
-print(f"Passed      : {passed}")
-print(f"Failed      : {failed}")
+accuracy = (passed / len(test_cases)) * 100 if test_cases else 0
+print(f"Total Tests      : {len(test_cases)}")
+print(f"Passed           : {passed}")
+print(f"Failed           : {failed}")
+print(f"Accuracy         : {accuracy:.2f}%")
 
-accuracy = (passed / len(test_cases)) * 100
+if accuracy >= 90:
+    print("Status           : Excellent")
+elif accuracy >= 80:
+    print("Status           : Good")
+else:
+    print("Status           : Needs Improvement")
 
-print(f"Accuracy    : {accuracy:.2f}%")
 print("=" * 60)
