@@ -12,6 +12,7 @@ from src.utils.schema_version import (
     load_schema_version,
     save_schema_version,
 )
+from src.utils.repositories import save_repository
 import os
 
 
@@ -101,6 +102,8 @@ def index_codebase(repo_path):
     print(f"\nStored {len(all_chunks)} chunks in ChromaDB successfully.")
 
     save_index_state(new_state)
+
+    save_repository(repository_name)
 
     print("\n" + "=" * 50)
     print("INDEXING SUMMARY")

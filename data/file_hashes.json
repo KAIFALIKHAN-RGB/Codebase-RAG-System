@@ -1,22 +1,5 @@
 {
-    "..\\python-dotenv\\tests\\conftest.py": "ff289b656b770b023a9278db9f9035f2e8dcb8894f06d1ec941c2e9cb62a8c57",
-    "..\\python-dotenv\\tests\\test_cli.py": "8aa6e2e591dc88e54b3fc2585744bbfdf954f1e81bf27b10b7ab08ecc7999547",
-    "..\\python-dotenv\\tests\\test_fifo_dotenv.py": "dd67f178c4f7a107796fe2ec781543f2d1eb53bc228b7419be8c286fad53efa5",
-    "..\\python-dotenv\\tests\\test_ipython.py": "05a0b42b2481ccb2bac0e50feb7ca6bace65f2d0c47fd853a73076c5157d98df",
-    "..\\python-dotenv\\tests\\test_is_interactive.py": "c480e1282553c912df0b5f94f5e7754f1a032fa4a230c96778cfa5d2d50bee82",
-    "..\\python-dotenv\\tests\\test_lib.py": "02a503f46a6c22efe8757eae54c7120298b16fc724f1fb34a8adb8a31607981d",
-    "..\\python-dotenv\\tests\\test_main.py": "d6ded7669d69c7f057a03565a7a802d6d4eaa196753a575ae4cf56177a88e635",
-    "..\\python-dotenv\\tests\\test_parser.py": "16cb7903231a8ee89c8cf4b30984e7b35a0ddc51936baee324f081d22f64d1a5",
-    "..\\python-dotenv\\tests\\test_utils.py": "f3a0574224769d31106fd2558c8b908f99dfab7e1aef5fea017929c24fb8b5e1",
-    "..\\python-dotenv\\tests\\test_variables.py": "02e9ed5cba1312cf8b854189bfdcda611d79ea33784ad531c82b53b60433d714",
-    "..\\python-dotenv\\tests\\test_zip_imports.py": "d2c74447d1edf623e20dde17174f647459af1c5596feb3e9c44715a8f1901014",
-    "..\\python-dotenv\\tests\\__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "..\\python-dotenv\\src\\dotenv\\cli.py": "f77c6e9fedbf64c50eb2edff72db95867227544f8e02b6bc794583b16fef1820",
-    "..\\python-dotenv\\src\\dotenv\\ipython.py": "123ef45515e87adc17290e39dc2b29b3f2fe8c8353028888bc7e2ab100d1fce1",
-    "..\\python-dotenv\\src\\dotenv\\main.py": "b07ced70f0e365b496c43290f4e109ef1cb5f402c9b97b87278f51449455a9eb",
-    "..\\python-dotenv\\src\\dotenv\\parser.py": "acb9c3f68191839f30b59198ed1d408dd2982211d235146e2310ec4d973a48e6",
-    "..\\python-dotenv\\src\\dotenv\\variables.py": "585f4061cd9cca9abe0d3d03f811b1d33191daf41bbdb578dbddb04c086dbc42",
-    "..\\python-dotenv\\src\\dotenv\\version.py": "6501d15fa5d36fc3c7531b76c945e5213092a2914e8e523c5f57dc87cb78b80f",
-    "..\\python-dotenv\\src\\dotenv\\__init__.py": "a80359f51323db70d28da783832a1764c47c68810aa9b8072ed99bbba629e7e0",
-    "..\\python-dotenv\\src\\dotenv\\__main__.py": "f7a57c4412241a28c92793853fd02d1c988794a974a5f95c1ae43703904d82d5"
+    "sample_repo\\app.py": "867b4ae3753be76fc211842ca963f2429373a90eff33d9a909844793f544c847",
+    "sample_repo\\models.py": "a70dbb9daf3cbe0f3ae5ea05f890ef22ab6eafdc506894c8e1e5d82934d62312",
+    "sample_repo\\__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 }
