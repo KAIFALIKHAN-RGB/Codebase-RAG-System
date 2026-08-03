@@ -1,35 +1,6 @@
 [
     {
         "repository": "sample_repo",
-        "type": "FunctionDef",
-        "name": "add",
-        "file_path": "sample_repo\\app.py",
-        "start_line": 1,
-        "end_line": 3,
-        "code": "def add(a: int, b: int) -> int:\n    \"\"\"Adds two numbers.\"\"\"\n    return a + b",
-        "parameters": [
-            "a",
-            "b"
-        ],
-        "docstring": "Adds two numbers.",
-        "parent_class": null,
-        "return_type": "int"
-    },
-    {
-        "repository": "sample_repo",
-        "type": "AsyncFunctionDef",
-        "name": "get_users",
-        "file_path": "sample_repo\\app.py",
-        "start_line": 6,
-        "end_line": 8,
-        "code": "async def get_users() -> list:\n    \"\"\"Returns all users.\"\"\"\n    return []",
-        "parameters": [],
-        "docstring": "Returns all users.",
-        "parent_class": null,
-        "return_type": "list"
-    },
-    {
-        "repository": "sample_repo",
         "type": "ClassDef",
         "name": "User",
         "file_path": "sample_repo\\models.py",
@@ -62,6 +33,19 @@
         "start_line": 13,
         "end_line": 16,
         "code": "class Guest:\n    def login(self):\n        \"\"\"Guest login\"\"\"\n        pass",
+        "parameters": [],
+        "docstring": null,
+        "parent_class": null,
+        "return_type": null
+    },
+    {
+        "repository": "sample_repo",
+        "type": "FunctionDef",
+        "name": "test_background_reindex",
+        "file_path": "sample_repo\\models.py",
+        "start_line": 18,
+        "end_line": 19,
+        "code": "def test_background_reindex():\n    return \"background indexing test\"",
         "parameters": [],
         "docstring": null,
         "parent_class": null,

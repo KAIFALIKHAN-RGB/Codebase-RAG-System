@@ -14,3 +14,4 @@ class Guest:
     def login(self):
         """Guest login"""
         pass
+
