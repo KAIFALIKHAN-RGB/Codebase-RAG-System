@@ -48,6 +48,14 @@ def delete_chunks_by_file(repository, file_path):
     }
 )  
 
+def delete_chunks_by_repository(repository):
+    collection = get_collection()
+    collection.delete(
+    where={
+        "repository": repository
+    }
+)
+
 def reset_database():
     global client, collection
 

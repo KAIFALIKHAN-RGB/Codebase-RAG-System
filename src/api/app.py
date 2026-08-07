@@ -2,10 +2,11 @@ import os
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from src.rag.pipeline import run_rag_pipeline
 from pydantic import BaseModel, Field, field_validator
-from pydantic import BaseModel
 from src.indexing.indexer import index_codebase
-from src.utils.repositories import load_repositories
-from src.storage.chroma_store import get_collection
+from src.utils.repositories import load_repositories, delete_repository
+from src.storage.chroma_store import get_collection, delete_chunks_by_repository
+from src.utils.index_status import set_index_status, get_index_status
+from src.utils.index_state import delete_repository_state
 
 app = FastAPI(title = "Codebase RAG API", version = "1.0.0")
 
@@ -61,6 +62,17 @@ async def query_rag(request: QueryRequest):
   except Exception as e:
     raise HTTPException(status_code=500, detail=str(e))
 
+def run_indexing_task(repo_path, repo_name):
+    try:
+        set_index_status(repo_name, "indexing")
+
+        index_codebase(repo_path)
+
+        set_index_status(repo_name, "completed")
+
+    except Exception:
+        set_index_status(repo_name, "failed")
+
 class IndexRequest(BaseModel):
   repo_path : str
 
@@ -68,6 +80,10 @@ class IndexResponse(BaseModel):
   success : bool
   repositories : str
   message : str
+
+class IndexStatusResponse(BaseModel):
+  repository : str
+  status : str
 
 class RepositoryListResponse(BaseModel):
   repositories : list[str]
@@ -78,8 +94,8 @@ async def index_repository(request: IndexRequest, background_tasks: BackgroundTa
     if not os.path.exists(request.repo_path):
         raise HTTPException(status_code=400, detail="Invalid repository path.")
     
-    background_tasks.add_task(index_codebase, request.repo_path)
-    repository_name = os.path.basename(os.path.normpath(request.repo_path)) #reposi
+    repository_name = os.path.basename(os.path.normpath(request.repo_path))
+    background_tasks.add_task(run_indexing_task, request.repo_path, repository_name)
     return {"success": True, "repositories": repository_name, "message": "Repository indexing started."}
 
   except HTTPException:
@@ -88,8 +104,52 @@ async def index_repository(request: IndexRequest, background_tasks: BackgroundTa
   except Exception as e:
     raise HTTPException(status_code=500, detail=str(e))
 
+@app.get(
+    "/index/status/{repo_name}",
+    response_model=IndexStatusResponse
+)
+async def indexing_status(repo_name: str):
+    status = get_index_status(repo_name)
+
+    if status == "not_found":
+        raise HTTPException(
+            status_code=404,
+            detail=f"No indexing status found for repository '{repo_name}'."
+        )
+
+    return {
+        "repository": repo_name,
+        "status": status
+    }
+
 @app.get("/repositories", response_model=RepositoryListResponse)
 async def get_repositories():
     return {
         "repositories": load_repositories()
     }
+
+@app.delete("/repositories/{repo_name}")
+async def remove_repository(repo_name: str):
+    repos = load_repositories()
+
+    if repo_name not in repos:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found."
+        )
+
+    try:
+        delete_chunks_by_repository(repo_name)
+        delete_repository_state(repo_name)
+        delete_repository(repo_name)
+
+        return {
+            "success": True,
+            "message": f"Repository '{repo_name}' deleted successfully."
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete repository: {str(e)}"
+        )

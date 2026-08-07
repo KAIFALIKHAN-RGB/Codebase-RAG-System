@@ -1,7 +1,10 @@
 import json
 import os
+from filelock import FileLock
 
 REPO_FILE = "data/repositories.json"
+
+LOCK_FILE = "data/repositories.lock"
 
 
 def load_repositories():
@@ -13,10 +16,25 @@ def load_repositories():
 
 
 def save_repository(repo_name):
-    repos = load_repositories()
+    with FileLock(LOCK_FILE):
+      repos = load_repositories()
 
-    if repo_name not in repos:
+      if repo_name not in repos:
         repos.append(repo_name)
 
-    with open(REPO_FILE, "w") as f:
-        json.dump(repos, f, indent=4)
+        with open(REPO_FILE, "w") as f:
+           json.dump(repos, f, indent=4)
+
+def delete_repository(repo_name):
+    with FileLock(LOCK_FILE):
+        repos = load_repositories()
+
+        if repo_name not in repos:
+            return False
+
+        repos.remove(repo_name)
+
+        with open(REPO_FILE, "w") as f:
+            json.dump(repos, f, indent=4)
+
+        return True
