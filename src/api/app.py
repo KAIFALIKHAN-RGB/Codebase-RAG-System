@@ -7,6 +7,14 @@ from src.utils.repositories import load_repositories, delete_repository
 from src.storage.chroma_store import get_collection, delete_chunks_by_repository
 from src.utils.index_status import set_index_status, get_index_status
 from src.utils.index_state import delete_repository_state
+from filelock import FileLock
+
+def get_repo_lock(repo_name):
+   lock_file = os.path.join(LOCK_DIR, f"{repo_name}.lock")
+   return FileLock(lock_file)   
+
+LOCK_DIR = "data/repo_locks"
+os.makedirs(LOCK_DIR, exist_ok=True)
 
 app = FastAPI(title = "Codebase RAG API", version = "1.0.0")
 
@@ -64,14 +72,15 @@ async def query_rag(request: QueryRequest):
 
 def run_indexing_task(repo_path, repo_name):
     try:
-        set_index_status(repo_name, "indexing")
+        with get_repo_lock(repo_name):  
+          set_index_status(repo_name, "indexing")
 
-        index_codebase(repo_path)
+          index_codebase(repo_path)
 
-        set_index_status(repo_name, "completed")
+          set_index_status(repo_name, "completed")
 
     except Exception:
-        set_index_status(repo_name, "failed")
+          set_index_status(repo_name, "failed")
 
 class IndexRequest(BaseModel):
   repo_path : str
@@ -139,9 +148,10 @@ async def remove_repository(repo_name: str):
         )
 
     try:
-        delete_chunks_by_repository(repo_name)
-        delete_repository_state(repo_name)
-        delete_repository(repo_name)
+        with get_repo_lock(repo_name):
+            delete_chunks_by_repository(repo_name)
+            delete_repository_state(repo_name)
+            delete_repository(repo_name)
 
         return {
             "success": True,

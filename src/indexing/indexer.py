@@ -7,6 +7,7 @@ from src.storage.chroma_store import (store_chunk, delete_chunks_by_file,reset_d
 from src.embeddings.embedder import get_embedding
 from src.utils.file_hash import get_hash_file
 from src.utils.index_state import load_index_state, save_index_state
+from src.utils.index_status import set_index_status
 from src.utils.schema_version import (
     SCHEMA_VERSION,
     load_schema_version,
@@ -16,7 +17,7 @@ from src.utils.repositories import save_repository
 import os
 
 
-def index_codebase(repo_path):
+def _index_codebase(repo_path):
     repository_name = os.path.basename(os.path.normpath(repo_path))
     files = load_python_file(repo_path)
 
@@ -114,3 +115,18 @@ def index_codebase(repo_path):
     print(f"Deleted files   : {deleted_files_count}")
     print(f"Chunks indexed  : {len(all_chunks)}")
     print("=" * 50)
+
+def index_codebase(repo_path):
+        repository_name = os.path.basename(os.path.normpath(repo_path))
+
+        set_index_status(repository_name, "indexing")
+
+        try:
+            _index_codebase(repo_path)
+            set_index_status(repository_name, "completed")
+
+        except Exception:
+            set_index_status(repository_name, "failed")
+            raise
+    
+    

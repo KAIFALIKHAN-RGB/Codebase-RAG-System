@@ -1,5 +1,5 @@
 class User:
-    def login(self, username, password):
+    def login(self, username, password): #User authentication model
         """User login"""
         pass
 
