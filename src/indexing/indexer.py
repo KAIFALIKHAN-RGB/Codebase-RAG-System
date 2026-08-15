@@ -6,7 +6,7 @@ from src.utils.storage import save_chunks
 from src.storage.chroma_store import (store_chunk, delete_chunks_by_file,reset_database)
 from src.embeddings.embedder import get_embedding
 from src.utils.file_hash import get_hash_file
-from src.utils.index_state import load_index_state, save_index_state
+from src.utils.index_state import (load_repository_state, save_repository_state)
 from src.utils.index_status import set_index_status
 from src.utils.schema_version import (
     SCHEMA_VERSION,
@@ -14,11 +14,22 @@ from src.utils.schema_version import (
     save_schema_version,
 )
 from src.utils.repositories import save_repository
+from filelock import FileLock
 import os
 
 
 def _index_codebase(repo_path):
     repository_name = os.path.basename(os.path.normpath(repo_path))
+    lock_dir = "data/repository_locks"
+    os.makedirs(lock_dir, exist_ok=True)
+
+    lock_file = os.path.join(lock_dir, f"{repository_name}.lock")
+
+    with FileLock(lock_file):
+        return _run_indexing(repo_path, repository_name)
+
+def _run_indexing(repo_path, repository_name):
+    
     files = load_python_file(repo_path)
 
     saved_version = load_schema_version()
@@ -45,7 +56,7 @@ def _index_codebase(repo_path):
 
 
     if saved_version == SCHEMA_VERSION:
-      old_state = load_index_state()
+      old_state = load_repository_state(repository_name)
     new_state = {}
 
     all_chunks = []
@@ -102,7 +113,7 @@ def _index_codebase(repo_path):
 
     print(f"\nStored {len(all_chunks)} chunks in ChromaDB successfully.")
 
-    save_index_state(new_state)
+    save_repository_state(repository_name, new_state)
 
     save_repository(repository_name)
 

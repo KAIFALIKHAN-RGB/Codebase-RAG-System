@@ -33,3 +33,32 @@ def delete_repository_state(repo_name):
 
     with open(STATE_FILE, "w", encoding="utf-8") as file:
         json.dump(new_state, file, indent=4)
+
+def load_repository_state(repo_name):
+    state = load_index_state()
+    prefix = repo_name + "\\"
+
+    return {
+        file_path: file_hash
+        for file_path, file_hash in state.items()
+        if file_path.startswith(prefix)
+    }
+
+
+def save_repository_state(repo_name, repo_state):
+    with FileLock(LOCK_FILE):
+        state = load_index_state()
+        prefix = repo_name + "\\"
+
+        state = {
+            file_path: file_hash
+            for file_path, file_hash in state.items()
+            if not file_path.startswith(prefix)
+        }
+
+        state.update(repo_state)
+
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(STATE_FILE, "w", encoding="utf-8") as file:
+            json.dump(state, file, indent=4)

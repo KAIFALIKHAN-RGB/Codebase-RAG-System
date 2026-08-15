@@ -1,5 +1,6 @@
-from src.storage.chroma_store import collection
+from src.storage.chroma_store import get_collection
 
+collection = get_collection()
 data = collection.get()
 
 seen = {}
@@ -7,6 +8,7 @@ duplicates = []
 
 for i, metadata in enumerate(data["metadatas"]):
     key = (
+        metadata.get("repository"),
         metadata.get("file_path"),
         metadata.get("name"),
         metadata.get("start_line"),
@@ -28,3 +30,4 @@ if duplicates:
         print(duplicate)
 else:
     print("\nNo duplicate chunks found.")
+    

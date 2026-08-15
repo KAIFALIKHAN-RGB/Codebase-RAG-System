@@ -2,7 +2,7 @@ from src.retrieval.retriever import search
 
 query = "what functionality does the user provide?"
 
-result = search(query=query,k=10,threshold=0.0)
+result = search(query=query,repository="sample_repo",k=10,threshold=0.0)
 
 print("\nRetrieved results for query:\n")
 
