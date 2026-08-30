@@ -48,6 +48,7 @@ def search(query, repository=None, k=3, threshold=30.0):
     )
 
     relevant_results = []
+    seen_chunks = set()
 
     # Extract returned data
     documents = results["documents"][0]
@@ -75,6 +76,20 @@ def search(query, repository=None, k=3, threshold=30.0):
         # Skip results below the similarity threshold
         if similarity < threshold:
             continue
+
+        # Create a unique identity for each code chunk
+        chunk_key = (
+            metadata.get("repository"),
+            metadata.get("file_path"),
+            metadata.get("start_line"),
+            metadata.get("end_line")
+        )
+
+        # Skip duplicate chunks
+        if chunk_key in seen_chunks:
+            continue
+
+        seen_chunks.add(chunk_key)
 
         # Store clean, structured result
         relevant_results.append({
