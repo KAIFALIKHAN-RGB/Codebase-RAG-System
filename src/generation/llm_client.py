@@ -9,11 +9,19 @@ load_dotenv()
 
 api_key = os.getenv("GEMINI_API_KEY")
 
-if not api_key:
-    raise ValueError("GEMINI_API_KEY is not set in the .env file.")
+client = None
 
-# Create the Gemini client
-client = genai.Client(api_key=api_key)
+
+def _get_client():
+    global client
+
+    if client is None:
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY is not set in the environment.")
+
+        client = genai.Client(api_key=api_key)
+
+    return client
 
 
 def generate_answer(question, context):
@@ -40,7 +48,7 @@ USER QUESTION:
 ANSWER:
 """
 
-    response = client.models.generate_content(
+    response = _get_client.models.generate_content(
         model="gemini-3.1-flash-lite",
         contents=prompt
     )
