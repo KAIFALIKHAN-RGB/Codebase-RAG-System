@@ -48,9 +48,10 @@ USER QUESTION:
 ANSWER:
 """
 
-    response = _get_client.models.generate_content(
+    response = _get_client().models.generate_content(
         model="gemini-3.1-flash-lite",
         contents=prompt
     )
-
+    if not response.text:
+        raise RuntimeError("Gemini returned an empty response.")
     return response.text
