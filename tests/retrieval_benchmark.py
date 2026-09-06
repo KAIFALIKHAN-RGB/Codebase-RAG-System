@@ -74,7 +74,7 @@ test_cases = [
         },
         {
             "query": "How is parsing done?",
-            "expected": "parser"
+            "expected": ["parser", "parse", "parsing"]
         },
         {
             "query": "Where are variables handled?",

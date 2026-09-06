@@ -136,3 +136,27 @@ def test_generate_answer_rejects_none_response_text(monkeypatch):
                 "What does x do?",
                 "def x():\n    return 42",
             )
+
+def test_generate_answer_rejects_malformed_response(monkeypatch):
+    from src.generation import llm_client
+
+    mock_client = MagicMock()
+
+    # Simulate a malformed Gemini response object
+    malformed_response = object()
+
+    mock_client.models.generate_content.return_value = malformed_response
+
+    monkeypatch.setattr(llm_client, "client", None)
+    monkeypatch.setattr(llm_client, "api_key", "fake-api-key")
+
+    with patch.object(
+        llm_client.genai,
+        "Client",
+        return_value=mock_client,
+    ):
+        with pytest.raises(AttributeError):
+            llm_client.generate_answer(
+                "What does x do?",
+                "def x():\n    return 42",
+            )
