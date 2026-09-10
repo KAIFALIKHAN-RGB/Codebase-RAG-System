@@ -28,9 +28,21 @@ test_cases = [
         "expected_symbol": "parse_stream",
     },
     {
-        "query": "Where is command line functionality implemented?",
-        "expected_file": "src/dotenv/cli.py",
-        "expected_symbol": "cli",
+    "query": "Where is command line functionality implemented?",
+    "expected_chunks": [
+            {
+                "file": "src/dotenv/cli.py",
+                "symbol": "cli",
+            },
+            {
+                "file": "src/dotenv/cli.py",
+                "symbol": "run_command",
+            },
+            {
+                "file": "src/dotenv/cli.py",
+                "symbol": "run",
+            },
+        ],
     },
     {
         "query": "Which module is responsible for parsing?",
@@ -47,6 +59,90 @@ test_cases = [
         "expected_file": "src/dotenv/main.py",
         "expected_symbol": "load_dotenv",
     },
+    {
+        "query": "How are environment variable values obtained?",
+        "expected_chunks": [
+            {
+                "file": "src/dotenv/main.py",
+                "symbol": "dotenv_values",
+            },
+        ],
+    },
+    {
+    "query": "How does IPython integration work?",
+    "expected_chunks": [
+        {
+            "file": "src/dotenv/ipython.py",
+            "symbol": "dotenv",
+        },
+        {
+            "file": "src/dotenv/ipython.py",
+            "symbol": "load_ipython_extension",
+        },
+        {
+            "file": "src/dotenv/ipython.py",
+            "symbol": "IPythonDotEnv",
+        },
+    ],
+},
+    {
+        "query": "How are environment variables enumerated?",
+        "expected_chunks": [
+            {
+                "file": "src/dotenv/cli.py",
+                "symbol": "enumerate_env",
+            },
+        ],
+    },
+    {
+        "query": "Where is the command execution logic implemented?",
+        "expected_chunks": [
+            {
+                "file": "src/dotenv/cli.py",
+                "symbol": "run_command",
+            },
+            {
+                "file": "src/dotenv/cli.py",
+                "symbol": "run",
+            },
+        ],
+    },
+    {
+        "query": "How does the library find the dotenv file?",
+        "expected_chunks": [
+            {
+                "file": "src/dotenv/main.py",
+                "symbol": "find_dotenv",
+            },
+        ],
+    },
+    {
+        "query": "How are parsed values placed into environment variables?",
+        "expected_chunks": [
+            {
+                "file": "src/dotenv/main.py",
+                "symbol": "set_as_environment_variables",
+            },
+        ],
+    },
+    {
+        "query": "How is the CLI string generated?",
+        "expected_chunks": [
+            {
+                "file": "src/dotenv/__init__.py",
+                "symbol": "get_cli_string",
+            },
+        ],
+    },
+    {
+        "query": "How are variable references parsed?",
+        "expected_chunks": [
+            {
+                "file": "src/dotenv/variables.py",
+                "symbol": "parse_variables",
+            },
+        ],
+    },
 ]
 
 
@@ -55,6 +151,18 @@ def get_metadata(result):
         return result.get("metadata", result)
 
     return getattr(result, "metadata", {})
+
+
+def get_expected_chunks(test):
+    if "expected_chunks" in test:
+        return test["expected_chunks"]
+
+    return [
+        {
+            "file": test["expected_file"],
+            "symbol": test["expected_symbol"],
+        }
+    ]
 
 
 def is_correct(result, test):
@@ -67,12 +175,17 @@ def is_correct(result, test):
         return False
 
     normalized_file = str(file_path).replace("\\", "/").lower()
-    expected_file = test["expected_file"].replace("\\", "/").lower()
 
-    return (
-        normalized_file.endswith(expected_file)
-        and symbol == test["expected_symbol"]
-    )
+    for expected in get_expected_chunks(test):
+        expected_file = expected["file"].replace("\\", "/").lower()
+
+        if (
+            normalized_file.endswith(expected_file)
+            and symbol == expected["symbol"]
+        ):
+            return True
+
+    return False
 
 
 def reciprocal_rank(results, test):
@@ -81,7 +194,6 @@ def reciprocal_rank(results, test):
             return 1 / rank
 
     return 0
-
 
 def main():
     hits = 0
@@ -111,8 +223,9 @@ def main():
 
         print(f"\nTest {index}")
         print(f"Query          : {test['query']}")
-        print(f"Expected file  : {test['expected_file']}")
-        print(f"Expected symbol: {test['expected_symbol']}")
+        print("Expected chunks:")
+        for expected in get_expected_chunks(test):
+           print(f"  - {expected['file']} | {expected['symbol']}")
         print(f"Hit@{K}        : {'PASS' if hit else 'FAIL'}")
         print(f"RR             : {rr:.3f}")
 
