@@ -22,11 +22,21 @@ test_cases = [
         "expected_file": "src/dotenv/cli.py",
         "expected_symbol": "cli",
     },
+
     {
         "query": "How are .env files parsed?",
-        "expected_file": "src/dotenv/parser.py",
-        "expected_symbol": "parse_stream",
+        "expected_chunks": [
+            {
+                "file": "src/dotenv/parser.py",
+                "symbol": "parse_stream"
+            },
+            {
+                "file": "src/dotenv/main.py",
+                "symbol": "load_dotenv"
+            }
+        ]
     },
+   
     {
     "query": "Where is command line functionality implemented?",
     "expected_chunks": [
@@ -69,22 +79,22 @@ test_cases = [
         ],
     },
     {
-    "query": "How does IPython integration work?",
-    "expected_chunks": [
-        {
-            "file": "src/dotenv/ipython.py",
-            "symbol": "dotenv",
-        },
-        {
-            "file": "src/dotenv/ipython.py",
-            "symbol": "load_ipython_extension",
-        },
-        {
-            "file": "src/dotenv/ipython.py",
-            "symbol": "IPythonDotEnv",
-        },
-    ],
-},
+        "query": "How does IPython integration work?",
+        "expected_chunks": [
+            {
+                "file": "src/dotenv/ipython.py",
+                "symbol": "dotenv",
+            },
+            {
+                "file": "src/dotenv/ipython.py",
+                "symbol": "load_ipython_extension",
+            },
+            {
+                "file": "src/dotenv/ipython.py",
+                "symbol": "IPythonDotEnv",
+            },
+        ],
+    },
     {
         "query": "How are environment variables enumerated?",
         "expected_chunks": [

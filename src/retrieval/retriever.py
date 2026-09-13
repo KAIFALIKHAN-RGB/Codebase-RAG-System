@@ -18,13 +18,14 @@ def search(query, repository=None, k=3, threshold=30.0):
 
     Args:
         query: User's search query.
-        k: Maximum number of results to retrieve.
+        repository: Optional repository name used to restrict retrieval.
+        k: Maximum number of final results to return.
         threshold: Minimum similarity percentage required.
 
     Returns:
         A dictionary containing:
-        - relevant search results
-        - retrieval time in milliseconds
+        - results: Relevant code chunks ranked by similarity.
+        - retrieval_time_ms: Retrieval time in milliseconds.
     """
 
     # Start measuring end-to-end retrieval time
@@ -33,17 +34,27 @@ def search(query, repository=None, k=3, threshold=30.0):
     # Convert the user's query into an embedding
     query_embedding = get_embedding(query)
 
-    #Normalize query into lowercase words for symbol matching
-    query_words = set(re.findall(r"[a-zA-Z0-9]+", query.lower()))
+    # Normalize query into lowercase words for symbol matching
+    query_words = set(
+        re.findall(r"[a-zA-Z0-9]+", query.lower())
+    )
 
+    # Apply repository filter when requested
     where_filter = None
-    if repository is not None:
-        where_filter = {"repository": repository}
 
-    # Retrieve the top-k nearest code chunks from ChromaDB
+    if repository is not None:
+        where_filter = {
+            "repository": repository
+        }
+
+    # Over-fetch candidates so that reranking and symbol boosting
+    # can influence the final top-k results.
+    candidate_count = max(k * 4, 20)
+
+    # Retrieve a larger candidate pool from ChromaDB
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=k,
+        n_results=candidate_count,
         where=where_filter
     )
 
@@ -55,7 +66,7 @@ def search(query, repository=None, k=3, threshold=30.0):
     metadatas = results["metadatas"][0]
     distances = results["distances"][0]
 
-    # Process and filter retrieved results
+    # Process and filter retrieved candidates
     for document, metadata, distance in zip(
         documents,
         metadatas,
@@ -67,15 +78,32 @@ def search(query, repository=None, k=3, threshold=30.0):
         # Get and normalize the code symbol name
         symbol_name = metadata.get("name", "")
 
-        #Check whether the symbol name appears in the user's query words
-        symbol_words = set(re.findall(r"[a-zA-Z0-9]+", symbol_name.lower().replace("_", " ")))
+        # Split symbol name into normalized words
+        symbol_words = set(
+            re.findall(
+                r"[a-zA-Z0-9]+",
+                symbol_name.lower().replace("_", " ")
+            )
+        )
 
+        # Boost results when the complete symbol appears
+        # in the user's query
         if symbol_words and symbol_words.issubset(query_words):
-            similarity += 15  # Boost similarity if symbol matches query
+            similarity += 15
 
-        # Skip results below the similarity threshold
+        # Keep the similarity threshold based on the raw retrieval score.
         if similarity < threshold:
             continue
+
+        # Prefer production code over test fixtures when ranking candidates.
+        file_path = metadata.get("file_path", "").replace("\\", "/")
+
+        ranking_score = similarity
+
+        if file_path.startswith("src/") or "/src/" in file_path:
+            ranking_score += 3
+        elif file_path.startswith("tests/") or "/tests/" in file_path:
+            ranking_score -= 3
 
         # Create a unique identity for each code chunk
         chunk_key = (
@@ -96,11 +124,24 @@ def search(query, repository=None, k=3, threshold=30.0):
             "code": document,
             "metadata": metadata,
             "distance": distance,
-            "similarity": round(similarity, 2)
-        })
+            "similarity": round(similarity, 2),
+            "ranking_score": round(ranking_score, 2)
+            
+         })
+
+    # Re-rank after similarity calculation and symbol boosting
+    relevant_results.sort(
+        key=lambda result: result["ranking_score"],
+        reverse=True
+    )
+
+    # Return only the requested number of final results
+    relevant_results = relevant_results[:k]
 
     # Calculate total retrieval time in milliseconds
-    retrieval_time_ms = (time.perf_counter() - start_time) * 1000
+    retrieval_time_ms = (
+        time.perf_counter() - start_time
+    ) * 1000
 
     # Return API-ready structured data
     return {
