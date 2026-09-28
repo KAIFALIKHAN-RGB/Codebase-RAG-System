@@ -44,3 +44,74 @@ def test_source_files_are_ranked_above_test_files():
 
     assert results[1]["similarity"] == 40.0
     assert results[1]["ranking_score"] == 37.0
+
+def test_repository_filter_isolated_with_source_test_ranking():
+        retriever.get_embedding = lambda query: [0.1, 0.2, 0.3]
+
+        def fake_query(**kwargs):
+            repository = kwargs["where"]["repository"]
+
+            if repository == "repo-a":
+                return {
+                    "documents": [[
+                        "repo-a test chunk",
+                        "repo-a source chunk",
+                    ]],
+                    "metadatas": [[
+                        {
+                            "repository": "repo-a",
+                            "file_path": "tests/test_cli.py",
+                            "name": "test_run",
+                        },
+                        {
+                            "repository": "repo-a",
+                            "file_path": "src/dotenv/cli.py",
+                            "name": "run_command",
+                        },
+                    ]],
+                    "distances": [[0.60, 0.62]],
+                }
+
+            return {
+                "documents": [[
+                    "repo-b test chunk",
+                    "repo-b source chunk",
+                ]],
+                "metadatas": [[
+                    {
+                        "repository": "repo-b",
+                        "file_path": "tests/test_cli.py",
+                        "name": "test_run",
+                    },
+                    {
+                        "repository": "repo-b",
+                        "file_path": "src/dotenv/cli.py",
+                        "name": "run_command",
+                    },
+                ]],
+                "distances": [[0.60, 0.62]],
+            }
+
+        retriever.collection.query = fake_query
+
+        for repository in ["repo-a", "repo-b"]:
+            result = retriever.search(
+                "Where is the command execution logic implemented?",
+                repository=repository,
+                k=2,
+                threshold=30,
+            )
+
+            results = result["results"]
+
+            assert len(results) == 2
+
+            assert all(
+                item["metadata"]["repository"] == repository
+                for item in results
+            )
+
+            assert results[0]["metadata"]["file_path"] == "src/dotenv/cli.py"
+            assert results[0]["metadata"]["name"] == "run_command"
+
+            assert results[0]["ranking_score"] > results[1]["ranking_score"]
