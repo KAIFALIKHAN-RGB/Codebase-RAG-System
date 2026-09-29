@@ -3,4 +3,6 @@ __pycache__/
 *.pyc
 .env
 .vscode/
-chroma_db/
+chroma_db/heldout_click/
+data/chroma_db/
+heldout_click/

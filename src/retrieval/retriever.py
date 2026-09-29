@@ -11,6 +11,44 @@ client = chromadb.PersistentClient(path="data/chroma_db")
 # Load the existing code chunks collection
 collection = client.get_collection("code_chunks")
 
+def _normalize_word(word):
+    word = word.lower()
+
+    # Common code/query alias
+    if word == "args":
+        return "argument"
+
+    # Plural
+    if word.endswith("ies") and len(word) > 4:
+        return word[:-3] + "y"
+
+    if word.endswith("es") and len(word) > 4:
+        return word[:-2]
+
+    if word.endswith("s") and len(word) > 3:
+        return word[:-1]
+
+    # Verb forms
+    # parsing -> parse
+    if word.endswith("ing") and len(word) > 5:
+        base = word[:-3]
+
+        if base.endswith("s"):
+            return base + "e"
+
+        return base
+
+    # parsed -> parse
+    if word.endswith("ed") and len(word) > 4:
+        base = word[:-2]
+
+        if base.endswith("s"):
+            return base + "e"
+
+        return base
+
+    return word
+
 
 def search(query, repository=None, k=3, threshold=30.0):
     """
@@ -35,9 +73,13 @@ def search(query, repository=None, k=3, threshold=30.0):
     query_embedding = get_embedding(query)
 
     # Normalize query into lowercase words for symbol matching
-    query_words = set(
-        re.findall(r"[a-zA-Z0-9]+", query.lower())
-    )
+    query_words = {
+        _normalize_word(word)
+        for word in re.findall(
+            r"[a-zA-Z0-9]+",
+            query.lower()
+        )
+    }
 
     # Apply repository filter when requested
     where_filter = None
@@ -79,12 +121,13 @@ def search(query, repository=None, k=3, threshold=30.0):
         symbol_name = metadata.get("name", "")
 
         # Split symbol name into normalized words
-        symbol_words = set(
-            re.findall(
-                r"[a-zA-Z0-9]+",
-                symbol_name.lower().replace("_", " ")
-            )
+        symbol_words = {
+        _normalize_word(word)
+        for word in re.findall(
+            r"[a-zA-Z0-9]+",
+            symbol_name.lower().replace("_", " ")
         )
+    }
 
         # Boost results when the complete symbol appears
         # in the user's query
