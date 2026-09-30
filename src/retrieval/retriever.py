@@ -50,7 +50,7 @@ def _normalize_word(word):
     return word
 
 
-def search(query, repository=None, k=3, threshold=30.0):
+def search(query, repository=None, k=3, threshold=35.0):
     """
     Search the codebase for the most relevant code chunks.
 
@@ -91,7 +91,7 @@ def search(query, repository=None, k=3, threshold=30.0):
 
     # Over-fetch candidates so that reranking and symbol boosting
     # can influence the final top-k results.
-    candidate_count = max(k * 4, 20)
+    candidate_count = max(k * 10, 50)
 
     # Retrieve a larger candidate pool from ChromaDB
     results = collection.query(
@@ -179,7 +179,26 @@ def search(query, repository=None, k=3, threshold=30.0):
     )
 
     # Return only the requested number of final results
-    relevant_results = relevant_results[:k]
+    MAX_PER_SYMBOL_NAME = 2
+
+    seen_names = {}
+    diverse_results = []
+
+    for result in relevant_results:
+        name = result["metadata"].get("name", "")
+
+        if name and seen_names.get(name, 0) >= MAX_PER_SYMBOL_NAME:
+            continue
+
+        diverse_results.append(result)
+
+        if name:
+            seen_names[name] = seen_names.get(name, 0) + 1
+
+        if len(diverse_results) >= k:
+            break
+
+    relevant_results = diverse_results
 
     # Calculate total retrieval time in milliseconds
     retrieval_time_ms = (

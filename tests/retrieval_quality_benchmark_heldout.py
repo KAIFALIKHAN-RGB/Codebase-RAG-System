@@ -8,7 +8,7 @@ from src.retrieval.retriever import search
 
 REPOSITORY = "heldout_click"
 K = 5
-THRESHOLD = 10
+THRESHOLD = 35
 
 
 test_cases = [

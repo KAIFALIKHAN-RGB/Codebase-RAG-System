@@ -3,7 +3,7 @@ from src.generation.context_builder import build_context
 from src.generation.llm_client import generate_answer
 
 
-def run_rag_pipeline(question,repository=None, k=3, threshold=30.0):
+def run_rag_pipeline(question,repository=None, k=3, threshold=35.0):
     """
     Run the complete RAG pipeline:
     retrieval -> context building -> answer generation
