@@ -65,6 +65,11 @@ def search(query, repository=None, k=3, threshold=35.0):
         - results: Relevant code chunks ranked by similarity.
         - retrieval_time_ms: Retrieval time in milliseconds.
     """
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("Query cannot be empty.")
+
+    if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
+        raise ValueError("k must be a positive integer.")
 
     # Start measuring end-to-end retrieval time
     start_time = time.perf_counter()
@@ -114,6 +119,8 @@ def search(query, repository=None, k=3, threshold=35.0):
         metadatas,
         distances
     ):
+        if not isinstance(metadata, dict):
+            continue
         # Convert cosine distance into similarity percentage
         similarity = max(0, (1 - distance) * 100)
 
@@ -174,8 +181,13 @@ def search(query, repository=None, k=3, threshold=35.0):
 
     # Re-rank after similarity calculation and symbol boosting
     relevant_results.sort(
-        key=lambda result: result["ranking_score"],
-        reverse=True
+        key=lambda result: (
+            -result["ranking_score"],
+            result["metadata"].get("repository") or "",
+            result["metadata"].get("file_path") or "",
+            result["metadata"].get("start_line", 0) or 0,
+            result["metadata"].get("end_line", 0) or 0,
+        )
     )
 
     # Return only the requested number of final results
