@@ -8,6 +8,7 @@ from src.storage.chroma_store import get_collection, delete_chunks_by_repository
 from src.utils.index_status import set_index_status, get_index_status
 from src.utils.index_state import delete_repository_state
 from filelock import FileLock
+from src.utils.repository_paths import save_repository_path, delete_repository_path
 
 def get_repo_lock(repo_name):
    lock_file = os.path.join(LOCK_DIR, f"{repo_name}.lock")
@@ -104,6 +105,7 @@ async def index_repository(request: IndexRequest, background_tasks: BackgroundTa
         raise HTTPException(status_code=400, detail="Invalid repository path.")
     
     repository_name = os.path.basename(os.path.normpath(request.repo_path))
+    save_repository_path(repository_name, request.repo_path)
     background_tasks.add_task(run_indexing_task, request.repo_path, repository_name)
     return {"success": True, "repositories": repository_name, "message": "Repository indexing started."}
 
@@ -152,6 +154,7 @@ async def remove_repository(repo_name: str):
             delete_chunks_by_repository(repo_name)
             delete_repository_state(repo_name)
             delete_repository(repo_name)
+            delete_repository_path(repo_name)
 
         return {
             "success": True,

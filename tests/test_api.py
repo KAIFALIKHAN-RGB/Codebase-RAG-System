@@ -160,23 +160,37 @@ def test_index_rejects_missing_repo_path():
     assert response.status_code == 422
 
 
-def test_index_starts_background_task_for_valid_repository():
+def test_index_starts_background_task_for_valid_repository(tmp_path):
+    from unittest.mock import patch
+
+    repo_path = tmp_path / "sample_repo"
+    repo_path.mkdir()
+
     with (
         patch("src.api.app.os.path.exists", return_value=True),
+        patch("src.api.app.os.path.isdir", return_value=True),
+        patch("src.api.app.save_repository_path", return_value=None),
         patch("src.api.app.run_indexing_task") as mock_task,
+        patch(
+            "src.utils.repository_paths.REPO_PATH_FILE",
+            str(tmp_path / "repository_paths.json"),
+            
+        ),
+        patch(
+            "src.utils.repository_paths.LOCK_FILE",
+            str(tmp_path / "repository_paths.lock"),
+            create=True,
+        ),
     ):
         response = client.post(
             "/index",
-            json={"repo_path": "C:/sample_repo"},
+            json={"repo_path": str(repo_path)},
         )
 
     assert response.status_code == 202
-    assert response.json() == {
-        "success": True,
-        "repositories": "sample_repo",
-        "message": "Repository indexing started.",
-    }
-    mock_task.assert_called_once()
+    assert response.json()["success"] is True
+    assert response.json()["repositories"] == "sample_repo"
+    mock_task.assert_called_once_with(str(repo_path), "sample_repo")
 
 
 def test_index_status_returns_status():

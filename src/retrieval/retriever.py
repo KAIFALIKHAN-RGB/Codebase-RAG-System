@@ -50,7 +50,7 @@ def _normalize_word(word):
     return word
 
 
-def search(query, repository=None, k=3, threshold=35.0):
+def search(query, repository=None, k=3, threshold=35.0, file_paths=None):
     """
     Search the codebase for the most relevant code chunks.
 
@@ -89,9 +89,20 @@ def search(query, repository=None, k=3, threshold=35.0):
     # Apply repository filter when requested
     where_filter = None
 
-    if repository is not None:
+    if repository is not None and file_paths:
+        where_filter = {
+            "$and": [
+                {"repository": repository},
+                {"file_path": {"$in": list(file_paths)}},
+            ]
+        }
+    elif repository is not None:
         where_filter = {
             "repository": repository
+        }
+    elif file_paths:
+        where_filter = {
+            "file_path": {"$in": list(file_paths)}
         }
 
     # Over-fetch candidates so that reranking and symbol boosting
