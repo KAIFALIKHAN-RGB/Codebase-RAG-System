@@ -1,6 +1,10 @@
 from src.retrieval.retriever import search
 from src.generation.context_builder import build_context
 from src.generation.llm_client import generate_answer
+from src.relationships.import_graph import build_import_graph
+from src.retrieval.graph_aware_retriever import graph_aware_search
+from src.utils.repository_paths import get_repository_path
+import src.retrieval.retriever as retriever_module
 
 
 def run_rag_pipeline(question,repository=None, k=3, threshold=35.0):
@@ -13,12 +17,38 @@ def run_rag_pipeline(question,repository=None, k=3, threshold=35.0):
         raise ValueError("Question cannot be empty.")
 
     # Step 1: Retrieve relevant code chunks
-    retrieval_output = search(
-        query=question,
-        repository=repository,
-        k=k,
-        threshold=threshold
+    repository_path = (
+        get_repository_path(repository)
+        if repository
+        else None
     )
+
+    if repository_path:
+        try:
+            graph = build_import_graph(repository_path)
+
+            retrieval_output = graph_aware_search(
+                retriever=retriever_module,
+                graph=graph,
+                query=question,
+                repository=repository,
+                k=k,
+                threshold=threshold,
+            )
+        except Exception:
+            retrieval_output = search(
+                query=question,
+                repository=repository,
+                k=k,
+                threshold=threshold,
+            )
+    else:
+        retrieval_output = search(
+            query=question,
+            repository=repository,
+            k=k,
+            threshold=threshold,
+        )
 
     retrieved_chunks = retrieval_output["results"]
 

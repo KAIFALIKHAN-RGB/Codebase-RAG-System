@@ -59,17 +59,31 @@ def graph_aware_search(
     if not seed_chunks:
         return seed_response
 
-    # Extract files represented by seed chunks
-    seed_files = {
-        _normalize_path(file_path)
-        for chunk in seed_chunks
-        if (file_path := _get_file_path(chunk))
+    # Match ChromaDB paths to repository-relative graph nodes.
+    graph_nodes = {
+        _normalize_path(node)
+        for node in getattr(graph, "nodes", set())
     }
+
+    seed_path_map = {}
+
+    for chunk in seed_chunks:
+        file_path = _get_file_path(chunk)
+        if not file_path:
+            continue
+
+        normalized_path = _normalize_path(file_path)
+
+        for node in graph_nodes:
+            if normalized_path == node or normalized_path.endswith("/" + node):
+                seed_path_map[node] = normalized_path
+                break
+
+    seed_files = set(seed_path_map)
 
     if not seed_files:
         return seed_response
 
-    # Expand through import/dependency graph
     related_files = expand_related_files(
         graph=graph,
         seed_files=seed_files,
@@ -78,13 +92,23 @@ def graph_aware_search(
         include_dependents=True,
     )
 
-    related_files = {
-        _normalize_path(path)
-        for path in related_files
-        if _normalize_path(path) not in seed_files
+    if not related_files:
+        return seed_response
+
+    # Preserve the exact path prefix used by ChromaDB metadata.
+    prefixes = {
+        seed_path[:-len(node)]
+        for node, seed_path in seed_path_map.items()
+        if node and seed_path.endswith(node)
     }
 
-    if not related_files:
+    related_query_paths = {
+        prefix.replace("/", "\\") + _normalize_path(path).replace("/", "\\")
+        for prefix in prefixes
+        for path in related_files
+    }
+
+    if not related_query_paths:
         return seed_response
 
     # Retrieve query-relevant chunks ONLY from graph-related files
@@ -93,7 +117,7 @@ def graph_aware_search(
         repository=repository,
         k=max(k * 2, 6),
         threshold=threshold,
-        file_paths=related_files,
+        file_paths=related_query_paths,
     )
 
     related_chunks = related_response.get("results", [])

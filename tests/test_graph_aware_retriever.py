@@ -226,3 +226,29 @@ def test_repository_metadata_is_preserved():
         item["metadata"]["repository"] == "repo-a"
         for item in result["results"]
     )
+
+def test_windows_path_prefix_is_preserved_for_related_files():
+    seed = chunk(
+        r"..\python-dotenv\src\dotenv\main.py",
+        repository="python-dotenv",
+    )
+    related = chunk(
+        r"..\python-dotenv\src\dotenv\cli.py",
+        repository="python-dotenv",
+    )
+
+    retriever = FakeRetriever([seed, related])
+
+    result = graph_aware_search(
+        retriever,
+        build_graph(),
+        "command line functionality",
+        repository="python-dotenv",
+    )
+
+    assert len(result["results"]) == 2
+    assert any(
+        item["metadata"]["file_path"]
+        == r"..\python-dotenv\src\dotenv\cli.py"
+        for item in result["results"]
+    )

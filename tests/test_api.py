@@ -169,7 +169,7 @@ def test_index_starts_background_task_for_valid_repository(tmp_path):
     with (
         patch("src.api.app.os.path.exists", return_value=True),
         patch("src.api.app.os.path.isdir", return_value=True),
-        patch("src.api.app.save_repository_path", return_value=None),
+        patch("src.api.app.save_repository_path", return_value=None) as mock_save_path,
         patch("src.api.app.run_indexing_task") as mock_task,
         patch(
             "src.utils.repository_paths.REPO_PATH_FILE",
@@ -191,6 +191,7 @@ def test_index_starts_background_task_for_valid_repository(tmp_path):
     assert response.json()["success"] is True
     assert response.json()["repositories"] == "sample_repo"
     mock_task.assert_called_once_with(str(repo_path), "sample_repo")
+    mock_save_path.assert_called_once_with("sample_repo", str(repo_path))
 
 
 def test_index_status_returns_status():
@@ -264,6 +265,7 @@ def test_delete_repository_success():
         patch("src.api.app.delete_chunks_by_repository") as mock_chunks,
         patch("src.api.app.delete_repository_state") as mock_state,
         patch("src.api.app.delete_repository") as mock_repo,
+        patch("src.api.app.delete_repository_path") as mock_path,
     ):
         response = client.delete("/repositories/sample_repo")
 
@@ -275,6 +277,7 @@ def test_delete_repository_success():
     mock_chunks.assert_called_once_with("sample_repo")
     mock_state.assert_called_once_with("sample_repo")
     mock_repo.assert_called_once_with("sample_repo")
+    mock_path.assert_called_once_with("sample_repo")
 
 
 def test_delete_repository_returns_500_on_failure():
