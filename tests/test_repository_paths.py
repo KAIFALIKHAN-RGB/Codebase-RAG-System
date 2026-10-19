@@ -1,4 +1,5 @@
 from pathlib import Path
+import pytest
 
 from src.utils.repository_paths import (
     delete_repository_path,
@@ -42,7 +43,9 @@ def test_save_and_get_repository_path(tmp_path, monkeypatch):
     )
 
 
-def test_save_updates_existing_repository(tmp_path, monkeypatch):
+def test_save_rejects_different_path_for_existing_repository(
+    tmp_path, monkeypatch
+):
     registry = tmp_path / "repository_paths.json"
     lock_file = tmp_path / "repository_paths.lock"
 
@@ -57,16 +60,18 @@ def test_save_updates_existing_repository(tmp_path, monkeypatch):
 
     first_repo = tmp_path / "repo1"
     second_repo = tmp_path / "repo2"
-
     first_repo.mkdir()
     second_repo.mkdir()
 
     save_repository_path("test-repo", str(first_repo))
-    save_repository_path("test-repo", str(second_repo))
 
-    assert get_repository_path("test-repo") == str(
-        Path(second_repo).resolve()
-    )
+    with pytest.raises(
+        ValueError,
+        match="Repository name already belongs to a different path",
+    ):
+        save_repository_path("test-repo", str(second_repo))
+
+    assert get_repository_path("test-repo") == str(first_repo.resolve())
 
 
 def test_invalid_repository_path_rejected(tmp_path, monkeypatch):

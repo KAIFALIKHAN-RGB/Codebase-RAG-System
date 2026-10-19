@@ -1,3 +1,4 @@
+import math
 from typing import Any
 
 from src.relationships.graph_expander import expand_related_files
@@ -20,6 +21,52 @@ def _chunk_key(chunk: dict[str, Any]) -> tuple:
         metadata.get("start_line"),
         metadata.get("end_line"),
     )
+
+
+def _has_repository(chunk: dict[str, Any], repository: str | None) -> bool:
+    return (
+        repository is None
+        or chunk.get("metadata", {}).get("repository") == repository
+    )
+
+
+def _rank_combined_chunks(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Use the retriever's score contract when all candidates provide it."""
+    if not all(
+        isinstance(chunk.get("ranking_score"), (int, float))
+        and not isinstance(chunk.get("ranking_score"), bool)
+        and math.isfinite(chunk["ranking_score"])
+        for chunk in chunks
+    ):
+        return chunks
+
+    return sorted(
+        chunks,
+        key=lambda chunk: (
+            -chunk["ranking_score"],
+            chunk.get("metadata", {}).get("repository") or "",
+            _normalize_path(chunk.get("metadata", {}).get("file_path", "")),
+            chunk.get("metadata", {}).get("start_line", 0) or 0,
+            chunk.get("metadata", {}).get("end_line", 0) or 0,
+        ),
+    )
+
+
+def _related_query_paths(
+    seed_path_map: dict[str, str],
+    related_files: list[str],
+) -> set[str]:
+    paths = set()
+
+    for node, seed_path in seed_path_map.items():
+        prefix = seed_path[:-len(node)] if seed_path.endswith(node) else ""
+
+        for path in related_files:
+            normalized_path = prefix + _normalize_path(path)
+            paths.add(normalized_path)
+            paths.add(normalized_path.replace("/", "\\"))
+
+    return paths
 
 
 def graph_aware_search(
@@ -54,10 +101,17 @@ def graph_aware_search(
         threshold=threshold,
     )
 
-    seed_chunks = seed_response.get("results", [])
+    seed_chunks = [
+        chunk
+        for chunk in seed_response.get("results", [])
+        if _has_repository(chunk, repository)
+    ]
 
     if not seed_chunks:
-        return seed_response
+        return {
+            "results": [],
+            "retrieval_time_ms": seed_response.get("retrieval_time_ms", 0.0),
+        }
 
     # Match ChromaDB paths to repository-relative graph nodes.
     graph_nodes = {
@@ -74,7 +128,7 @@ def graph_aware_search(
 
         normalized_path = _normalize_path(file_path)
 
-        for node in graph_nodes:
+        for node in sorted(graph_nodes):
             if normalized_path == node or normalized_path.endswith("/" + node):
                 seed_path_map[node] = normalized_path
                 break
@@ -82,7 +136,10 @@ def graph_aware_search(
     seed_files = set(seed_path_map)
 
     if not seed_files:
-        return seed_response
+        return {
+            "results": seed_chunks[:k],
+            "retrieval_time_ms": seed_response.get("retrieval_time_ms", 0.0),
+        }
 
     related_files = expand_related_files(
         graph=graph,
@@ -93,23 +150,18 @@ def graph_aware_search(
     )
 
     if not related_files:
-        return seed_response
+        return {
+            "results": seed_chunks[:k],
+            "retrieval_time_ms": seed_response.get("retrieval_time_ms", 0.0),
+        }
 
-    # Preserve the exact path prefix used by ChromaDB metadata.
-    prefixes = {
-        seed_path[:-len(node)]
-        for node, seed_path in seed_path_map.items()
-        if node and seed_path.endswith(node)
-    }
-
-    related_query_paths = {
-        prefix.replace("/", "\\") + _normalize_path(path).replace("/", "\\")
-        for prefix in prefixes
-        for path in related_files
-    }
+    related_query_paths = _related_query_paths(seed_path_map, related_files)
 
     if not related_query_paths:
-        return seed_response
+        return {
+            "results": seed_chunks[:k],
+            "retrieval_time_ms": seed_response.get("retrieval_time_ms", 0.0),
+        }
 
     # Retrieve query-relevant chunks ONLY from graph-related files
     related_response = retriever.search(
@@ -120,9 +172,12 @@ def graph_aware_search(
         file_paths=related_query_paths,
     )
 
-    related_chunks = related_response.get("results", [])
+    related_chunks = [
+        chunk
+        for chunk in related_response.get("results", [])
+        if _has_repository(chunk, repository)
+    ]
 
-    # Merge while preserving primary vector results first
     combined = []
     seen = set()
 
@@ -135,8 +190,10 @@ def graph_aware_search(
         seen.add(key)
         combined.append(chunk)
 
+    combined = _rank_combined_chunks(combined)
+
     return {
-        "results": combined,
+        "results": combined[:k],
         "retrieval_time_ms": (
             seed_response.get("retrieval_time_ms", 0.0)
             + related_response.get("retrieval_time_ms", 0.0)

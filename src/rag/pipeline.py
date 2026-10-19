@@ -7,7 +7,13 @@ from src.utils.repository_paths import get_repository_path
 import src.retrieval.retriever as retriever_module
 
 
-def run_rag_pipeline(question,repository=None, k=3, threshold=35.0):
+def run_rag_pipeline(
+    question,
+    repository=None,
+    k=3,
+    threshold=35.0,
+    graph_aware=False,
+):
     """
     Run the complete RAG pipeline:
     retrieval -> context building -> answer generation
@@ -17,13 +23,12 @@ def run_rag_pipeline(question,repository=None, k=3, threshold=35.0):
         raise ValueError("Question cannot be empty.")
 
     # Step 1: Retrieve relevant code chunks
-    repository_path = (
-        get_repository_path(repository)
-        if repository
-        else None
-    )
+    if graph_aware and repository:
+        repository_path = get_repository_path(repository)
+    else:
+        repository_path = None
 
-    if repository_path:
+    if graph_aware and repository_path:
         try:
             graph = build_import_graph(repository_path)
 

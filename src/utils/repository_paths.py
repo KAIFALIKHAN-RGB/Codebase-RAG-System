@@ -20,13 +20,22 @@ def save_repository_path(repo_name, repo_path):
     canonical_path = os.path.realpath(repo_path)
 
     if not os.path.isdir(canonical_path):
-        raise ValueError("Repository path must be an existing directory.")
+        raise ValueError(
+            "Repository path must be an existing directory."
+        )
 
     os.makedirs(os.path.dirname(LOCK_FILE), exist_ok=True)
     os.makedirs(os.path.dirname(REPO_PATH_FILE), exist_ok=True)
 
     with FileLock(LOCK_FILE):
         paths = load_repository_paths()
+        existing_path = paths.get(repo_name)
+
+        if existing_path and existing_path != canonical_path:
+            raise ValueError(
+                "Repository name already belongs to a different path."
+            )
+
         paths[repo_name] = canonical_path
 
         with open(REPO_PATH_FILE, "w", encoding="utf-8") as f:

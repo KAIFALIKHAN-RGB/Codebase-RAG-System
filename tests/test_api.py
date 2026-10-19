@@ -325,3 +325,40 @@ def test_delete_repository_returns_500_on_failure():
 def test_get_repo_lock_rejects_invalid_repository_name(repo_name):
     with pytest.raises(ValueError, match="Invalid repository name"):
         get_repo_lock(repo_name)
+
+def test_query_rejects_query_longer_than_max_length():
+    response = client.post(
+        "/query",
+        json={
+            "query": "a" * 4001,
+            "repository": "sample_repo",
+        },
+    )
+
+    assert response.status_code == 422
+
+def test_index_returns_409_when_repository_name_conflicts(tmp_path):
+    repo_path = tmp_path / "sample_repo"
+    repo_path.mkdir()
+
+    with (
+        patch("src.api.app.os.path.exists", return_value=True),
+        patch("src.api.app.os.path.isdir", return_value=True),
+        patch(
+            "src.api.app.save_repository_path",
+            side_effect=ValueError(
+                "Repository name already belongs to a different path."
+            ),
+        ),
+        patch("src.api.app.run_indexing_task") as mock_task,
+    ):
+        response = client.post(
+            "/index",
+            json={"repo_path": str(repo_path)},
+        )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Repository name already belongs to a different path."
+    )
+    mock_task.assert_not_called()

@@ -16,6 +16,9 @@ class FakeRetriever:
     ):
         chunks = self.chunks
 
+        if file_paths is None:
+            chunks = chunks[:k]
+
         if file_paths is not None:
             normalized_paths = {
                 str(path).replace("\\", "/")
@@ -41,8 +44,9 @@ def chunk(
     start=1,
     end=5,
     repository="repo",
+    ranking_score=None,
 ):
-    return {
+    result = {
         "metadata": {
             "repository": repository,
             "file_path": file_path,
@@ -50,6 +54,9 @@ def chunk(
             "end_line": end,
         }
     }
+    if ranking_score is not None:
+        result["ranking_score"] = ranking_score
+    return result
 
 
 def build_graph():
@@ -141,6 +148,58 @@ def test_duplicate_chunks_are_removed():
     assert len(result["results"]) == 1
 
 
+def test_results_are_limited_to_k():
+    seed = chunk("src/main.py", ranking_score=1)
+    imported = chunk("src/utils.py", ranking_score=3)
+    dependent = chunk("src/helper.py", ranking_score=2)
+
+    retriever = FakeRetriever([seed, imported, dependent])
+
+    result = graph_aware_search(
+        retriever,
+        build_graph(),
+        "related logic",
+        k=2,
+    )
+
+    assert len(result["results"]) == 2
+    assert [
+        item["metadata"]["file_path"]
+        for item in result["results"]
+    ] == ["src/utils.py", "src/helper.py"]
+
+
+def test_combined_candidates_are_ranked_by_existing_score():
+    seed = chunk("src/main.py", ranking_score=10)
+    imported = chunk("src/utils.py", ranking_score=20)
+
+    result = graph_aware_search(
+        FakeRetriever([seed, imported]),
+        build_graph(),
+        "utility logic",
+        k=2,
+    )
+
+    assert [
+        item["metadata"]["file_path"]
+        for item in result["results"]
+    ] == ["src/utils.py", "src/main.py"]
+
+
+def test_missing_scores_preserve_stable_order_without_fabricating_scores():
+    seed = chunk("src/main.py")
+    imported = chunk("src/utils.py")
+
+    result = graph_aware_search(
+        FakeRetriever([seed, imported]),
+        build_graph(),
+        "utility logic",
+        k=2,
+    )
+
+    assert result["results"] == [seed, imported]
+
+
 def test_no_related_files_returns_vector_results():
     seed = chunk("src/main.py")
 
@@ -227,6 +286,21 @@ def test_repository_metadata_is_preserved():
         for item in result["results"]
     )
 
+
+def test_cross_repository_chunks_are_excluded():
+    seed = chunk("src/main.py", repository="repo-a", ranking_score=10)
+    related = chunk("src/utils.py", repository="repo-b", ranking_score=100)
+
+    result = graph_aware_search(
+        FakeRetriever([seed, related]),
+        build_graph(),
+        "utility logic",
+        repository="repo-a",
+    )
+
+    assert result["results"] == [seed]
+
+
 def test_windows_path_prefix_is_preserved_for_related_files():
     seed = chunk(
         r"..\python-dotenv\src\dotenv\main.py",
@@ -250,5 +324,30 @@ def test_windows_path_prefix_is_preserved_for_related_files():
     assert any(
         item["metadata"]["file_path"]
         == r"..\python-dotenv\src\dotenv\cli.py"
+        for item in result["results"]
+    )
+
+
+def test_posix_path_prefix_is_preserved_for_related_files():
+    seed = chunk(
+        "../python-dotenv/src/dotenv/main.py",
+        repository="python-dotenv",
+    )
+    related = chunk(
+        "../python-dotenv/src/dotenv/cli.py",
+        repository="python-dotenv",
+    )
+
+    result = graph_aware_search(
+        FakeRetriever([seed, related]),
+        build_graph(),
+        "command line functionality",
+        repository="python-dotenv",
+    )
+
+    assert len(result["results"]) == 2
+    assert any(
+        item["metadata"]["file_path"]
+        == "../python-dotenv/src/dotenv/cli.py"
         for item in result["results"]
     )

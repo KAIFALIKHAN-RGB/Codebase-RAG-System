@@ -50,7 +50,7 @@ async def health():
         )
 
 class QueryRequest(BaseModel):
-  query : str = Field(..., min_length=1)
+  query : str = Field(..., min_length=1 , max_length=4000)
   repository : str = Field(..., min_length=1)
 
   @field_validator("query", "repository")
@@ -122,13 +122,19 @@ async def index_repository(request: IndexRequest, background_tasks: BackgroundTa
     return {"success": True, "repositories": repository_name, "message": "Repository indexing started."}
 
   except HTTPException:
-    raise
+        raise
 
-  except Exception as e:
-    raise HTTPException(
-        status_code=500,
-        detail="Internal server error.",
-    )
+  except ValueError as e:
+        raise HTTPException(
+            status_code=409,
+            detail=str(e),
+        )
+
+  except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error.",
+        )
 
 @app.get(
     "/index/status/{repo_name}",
