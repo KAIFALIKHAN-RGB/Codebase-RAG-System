@@ -11,8 +11,17 @@ from filelock import FileLock
 from src.utils.repository_paths import save_repository_path, delete_repository_path
 
 def get_repo_lock(repo_name):
-   lock_file = os.path.join(LOCK_DIR, f"{repo_name}.lock")
-   return FileLock(lock_file)   
+    if (
+        not repo_name
+        or repo_name in {".", ".."}
+        or os.path.basename(repo_name) != repo_name
+        or "/" in repo_name
+        or "\\" in repo_name
+    ):
+        raise ValueError("Invalid repository name.")
+
+    lock_file = os.path.join(LOCK_DIR, f"{repo_name}.lock")
+    return FileLock(lock_file)
 
 LOCK_DIR = "data/repo_locks"
 os.makedirs(LOCK_DIR, exist_ok=True)
@@ -37,7 +46,7 @@ async def health():
     except Exception as e:
         raise HTTPException(
             status_code=503,
-            detail=f"ChromaDB unavailable: {str(e)}"
+            detail="ChromaDB unavailable."
         )
 
 class QueryRequest(BaseModel):
@@ -68,8 +77,11 @@ async def query_rag(request: QueryRequest):
   except HTTPException:
     raise 
 
-  except Exception as e:
-    raise HTTPException(status_code=500, detail=str(e))
+  except Exception:
+    raise HTTPException(
+        status_code=500,
+        detail="Internal server error.",
+    )
 
 def run_indexing_task(repo_path, repo_name):
     try:
@@ -113,7 +125,10 @@ async def index_repository(request: IndexRequest, background_tasks: BackgroundTa
     raise
 
   except Exception as e:
-    raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(
+        status_code=500,
+        detail="Internal server error.",
+    )
 
 @app.get(
     "/index/status/{repo_name}",
@@ -164,5 +179,5 @@ async def remove_repository(repo_name: str):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to delete repository: {str(e)}"
+            detail="Failed to delete repository."
         )

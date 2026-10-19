@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
+from src.api.app import get_repo_lock
 
 from src.api.app import app
 
@@ -113,7 +114,9 @@ def test_query_returns_500_when_pipeline_fails():
         )
 
     assert response.status_code == 500
-    assert response.json()["detail"] == "Pipeline failure"
+    assert response.json()["detail"] == "Internal server error."
+    assert "Pipeline failure" not in response.json()["detail"]
+    
 
 def test_health_returns_healthy_when_chromadb_is_available():
     mock_collection = patch(
@@ -140,7 +143,7 @@ def test_health_returns_503_when_chromadb_fails():
         response = client.get("/health")
 
     assert response.status_code == 503
-    assert "ChromaDB unavailable" in response.json()["detail"]
+    assert response.json()["detail"] == "ChromaDB unavailable."
 
 
 def test_index_rejects_invalid_repository_path():
@@ -313,4 +316,12 @@ def test_delete_repository_returns_500_on_failure():
         response = client.delete("/repositories/sample_repo")
 
     assert response.status_code == 500
-    assert "Failed to delete repository" in response.json()["detail"]
+    assert response.json()["detail"] == "Failed to delete repository."
+
+@pytest.mark.parametrize(
+    "repo_name",
+    ["", ".", "..", "../outside", "nested/repo", r"nested\repo"],
+)
+def test_get_repo_lock_rejects_invalid_repository_name(repo_name):
+    with pytest.raises(ValueError, match="Invalid repository name"):
+        get_repo_lock(repo_name)
