@@ -1,256 +1,340 @@
-# 🚀 Codebase RAG System
+# Codebase RAG System
 
-An AI-powered Codebase Retrieval-Augmented Generation (RAG) system designed to understand and search Python repositories using Abstract Syntax Trees (AST), semantic chunking, embeddings, vector search, and metadata-aware retrieval.
+Codebase RAG System is a Python-focused retrieval-augmented generation application for asking natural-language questions about indexed repositories. It parses Python source code into AST-based semantic chunks, embeds those chunks for vector search, stores them in persistent ChromaDB, builds grounded context, and generates answers with Gemini.
 
-The system currently provides an end-to-end pipeline for indexing Python source code and retrieving relevant code chunks using natural-language queries.
+The project includes a FastAPI service for indexing repositories, querying indexed code, checking index status, listing repositories, and removing repository data.
 
-## ✨ Features
+## What is implemented
 
-- 📂 Recursively loads Python source files
-- 🌳 Parses source code using Python AST
-- ✂️ Performs AST-based semantic code chunking
-- 📝 Extracts rich metadata:
-  - Function and class names
-  - Symbol type
-  - Parameters
-  - Docstrings
-  - Parent class
-  - Return type
-  - File path
-  - Start and end line numbers
-- ⚡ Supports asynchronous functions (async def)
-- 🧠 Generates semantic embeddings using Sentence Transformers
-- 🗄️ Stores embeddings and metadata in persistent ChromaDB storage
-- 🔑 Uses stable chunk IDs for reliable re-indexing
-- 🔄 Uses upsert() for safe chunk insertion and updates
-- 🔎 Supports natural-language semantic code search
-- 🎯 Retrieves Top-K relevant code chunks
-- 📏 Calculates similarity scores from vector distance
-- 🚦 Filters weak results using a configurable similarity threshold
-- ⏱️ Tracks end-to-end retrieval latency
-- 📦 Returns structured, metadata-rich retrieval results
+### Repository ingestion and indexing
 
-## 🏗️ Current Pipeline
+The indexing pipeline:
 
-Python Repository
-        ↓
-Load Python Files
-        ↓
-Read Source Code
-        ↓
-AST Parsing
-        ↓
-Semantic Code Chunking
-        ↓
-Metadata Extraction
-        ↓
-Embedding Generation
-        ↓
-ChromaDB Vector Storage
-        ↓
-Natural-Language Query
-        ↓
-Query Embedding
-        ↓
-Top-K Vector Search
-        ↓
-Similarity Scoring
-        ↓
-Threshold Filtering
-        ↓
-Structured Code Results
-## 🔎 Semantic Retrieval
+1. Recursively discovers Python files under a repository.
+2. Skips `.venv`, `venv`, `__pycache__`, `.git`, and `tests` directories.
+3. Parses each file with Python's `ast` module.
+4. Extracts semantic chunks for classes, regular functions, and asynchronous functions.
+5. Records chunk metadata including:
+   - repository name
+   - symbol name and AST type
+   - file path
+   - start and end line numbers
+   - function parameters
+   - docstring
+   - containing class, when applicable
+   - return annotation, when available
+6. Generates embeddings with Sentence Transformers using `all-MiniLM-L6-v2`.
+7. Stores code, embeddings, and metadata in the persistent ChromaDB collection `code_chunks`.
 
-The system accepts natural-language queries such as:
+Chunks use stable IDs based on file path and line range. Indexing uses ChromaDB upserts and maintains repository file-hash state so unchanged files can be skipped. Repository indexing runs as a FastAPI background task and exposes `indexing`, `completed`, and `failed` status values.
 
-adds two numbers
-The retrieval pipeline:
+### Retrieval
 
-1. Converts the query into an embedding.
-2. Searches ChromaDB for the Top-K nearest code chunks.
-3. Converts vector distance into a readable similarity score.
-4. Filters weak matches using a configurable threshold.
-5. Returns relevant code with structured metadata.
+The vector retriever:
 
-Example output:
+- embeds the natural-language query with the same Sentence Transformers model;
+- retrieves an over-fetched candidate set from ChromaDB;
+- converts cosine distance into a similarity percentage;
+- applies the configured similarity threshold;
+- boosts results when the complete normalized symbol name appears in the query;
+- prefers production `src` files over test files;
+- removes duplicate chunks;
+- applies deterministic ordering and returns up to `k` results.
 
-Result 1
-Similarity: 74.76%
-Name: add
-Type: FunctionDef
-File: sample_repo/app.py
-Lines: 1 - 3
-Parent Class: None
-Parameters: a,b
-Return Type: int
+Each result contains the code plus metadata, vector distance, similarity, and `ranking_score`.
 
-Code Snippet:
+### RAG answer generation
 
-def add(a: int, b: int) -> int:
-    """Adds two numbers."""
-    return a + b
+The standard RAG pipeline is:
 
-Retrieval Time: 72.62 ms
-> The displayed latency is from a small local test repository and is not a production benchmark.
+```text
+Question
+  -> vector retrieval
+  -> structured context building
+  -> Gemini answer generation
+  -> answer, sources, and retrieval time
+```
 
-## ⚙️ Retrieval Configuration
+The context builder formats each retrieved chunk with its source number, file, symbol, line range, and Python code. The Gemini client uses the `GEMINI_API_KEY` environment variable and the `gemini-3.1-flash-lite` model. The prompt instructs Gemini to use only the supplied code context and to say when the context is insufficient.
 
-The retrieval function supports configurable search parameters:
+### FastAPI service
 
-search(
-    query="adds two numbers",
-    k=3,
-    threshold=30.0
-)
-- `query → Natural-language search query
-- k → Maximum number of candidate chunks to retrieve
-- threshold → Minimum similarity score required for a result
+The application is defined in `src/api/app.py` and can be run with Uvicorn. The service uses persistent local files and ChromaDB under `data/`; it is intended for local development and evaluation rather than a claim of production deployment readiness.
 
-The current threshold is an initial baseline and will be tuned later through retrieval evaluation on larger repositories.
+## API
 
-## 📦 Structured Retrieval Results
+### `GET /`
 
-The retrieval layer returns structured results containing:
+Returns a basic service message:
 
-- Similarity score
-- Vector distance
-- Symbol name
-- Symbol type
-- File path
-- Start and end lines
-- Parent class
-- Parameters
-- Return type
-- Code snippet
+```json
+{
+  "message": "Codebase RAG API is running."
+}
+```
 
-This structure is designed for future integration with FastAPI, LLM pipelines, evaluation systems, and agent tools.
+### `GET /health`
 
-## 📁 Project Structure
+Checks whether the ChromaDB collection can be opened and counted.
 
-``text
+Successful response:
+
+```json
+{
+  "status": "healthy",
+  "chromadb": "connected"
+}
+```
+
+If ChromaDB is unavailable, the endpoint returns HTTP 503 with a `detail` message.
+
+### `POST /query`
+
+Queries an indexed repository and generates an answer from retrieved code.
+
+Request body:
+
+```json
+{
+  "query": "Where is the command execution logic implemented?",
+  "repository": "python-dotenv"
+}
+```
+
+Both fields are required non-empty strings. Whitespace-only values are rejected. The repository must already be indexed; otherwise the endpoint returns HTTP 404.
+
+Successful response fields:
+
+```json
+{
+  "answer": "Generated answer text",
+  "sources": [
+    {
+      "code": "def example(): ...",
+      "metadata": {
+        "name": "example",
+        "start_line": 1,
+        "end_line": 2,
+        "type": "FunctionDef",
+        "repository": "python-dotenv",
+        "file_path": "..."
+      },
+      "distance": 0.2,
+      "similarity": 80.0,
+      "ranking_score": 83.0
+    }
+  ]
+}
+```
+
+The declared `QueryResponse` schema contains `answer` and `sources`. The pipeline also produces `retrieval_time_ms`; the service implementation returns the pipeline result, but this timing field is not declared in the Pydantic response model.
+
+Normal API queries use vector-only retrieval. Graph-aware retrieval is not enabled by this endpoint.
+
+### `POST /index`
+
+Starts indexing for a local repository path as a background task.
+
+Request body:
+
+```json
+{
+  "repo_path": "C:\\Users\\you\\Projects\\my-repository"
+}
+```
+
+The path must exist. The repository name is derived from the final directory name.
+
+Successful response: HTTP 202
+
+```json
+{
+  "success": true,
+  "repositories": "my-repository",
+  "message": "Repository indexing started."
+}
+```
+
+The response field is named `repositories` in the implemented `IndexResponse` model, even though it contains one repository name.
+
+### `GET /index/status/{repo_name}`
+
+Returns the current indexing status:
+
+```json
+{
+  "repository": "my-repository",
+  "status": "completed"
+}
+```
+
+If no status exists for the name, the endpoint returns HTTP 404.
+
+### `GET /repositories`
+
+Lists repository names recorded by the application:
+
+```json
+{
+  "repositories": [
+    "my-repository"
+  ]
+}
+```
+
+### `DELETE /repositories/{repo_name}`
+
+Removes a repository from the application. The endpoint deletes its ChromaDB chunks, index state, repository registration, and saved repository path.
+
+Successful response:
+
+```json
+{
+  "success": true,
+  "message": "Repository 'my-repository' deleted successfully."
+}
+```
+
+An unknown repository returns HTTP 404. Deletion failures return HTTP 500 with a `detail` message.
+
+## Windows PowerShell setup
+
+From the repository root:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
+```
+
+If PowerShell blocks script activation for the current user, allow locally created scripts and activate again:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+.\.venv\Scripts\Activate.ps1
+```
+
+The runtime dependencies are pinned in `requirements.txt`. Development and test dependencies are pinned in `requirements-dev.txt`.
+
+## Configure Gemini
+
+The Gemini client loads environment variables with `python-dotenv` and requires `GEMINI_API_KEY` when an answer is generated.
+
+For the current PowerShell session:
+
+```powershell
+$env:GEMINI_API_KEY = "your-api-key"
+```
+
+Alternatively, create a local `.env` file in the repository root:
+
+```text
+GEMINI_API_KEY=your-api-key
+```
+
+Do not commit API keys or machine-specific environment files.
+
+## Run the application
+
+Start the FastAPI service with Uvicorn:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn src.api.app:app --reload
+```
+
+The service exposes the routes documented above. The project does not define a deployment URL in the repository.
+
+For a simple command-line indexing run, `main.py` accepts an optional repository path and defaults to `sample_repo`:
+
+```powershell
+.\.venv\Scripts\python.exe main.py .\sample_repo
+```
+
+For an interactive command-line question-and-answer demo:
+
+```powershell
+.\.venv\Scripts\python.exe rag_pipeline_demo.py
+```
+
+## Run tests
+
+Pytest is configured in `pytest.ini` to discover tests under `tests` with `test_*.py` filenames.
+
+Run the complete test suite:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+Run a focused test module:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\test_retriever.py
+```
+
+The repository also contains retrieval and graph benchmark scripts under `tests`. These are evaluation scripts, not API endpoints.
+
+## Implemented, experimental, and planned work
+
+### Implemented
+
+- Python repository discovery and AST parsing
+- Semantic class and function chunking
+- Rich chunk metadata extraction
+- Sentence Transformers embeddings
+- Persistent ChromaDB storage
+- Incremental indexing state and repository deletion
+- Vector retrieval with thresholding and deterministic ranking
+- Structured context construction
+- Gemini-based grounded answer generation
+- FastAPI indexing, querying, health, status, listing, and deletion endpoints
+- Pytest-based unit and integration coverage
+
+### Experimental and on hold
+
+The repository contains an import-graph implementation and an optional graph-aware retriever. It can expand candidates through imported files and dependents, merge candidates, and rank them using existing retrieval scores when available.
+
+Graph-aware retrieval is currently experimental and on hold. It is not enabled for normal API queries, and the current benchmark does not demonstrate an accuracy, MRR, Hit@K, or context-recall improvement over vector-only retrieval. It remains available as an explicit Python pipeline option with `graph_aware=True` for further relationship-focused evaluation.
+
+### Future plans
+
+Potential future work includes broader relationship-focused evaluation, improved API controls for explicitly selecting retrieval modes, and additional production hardening. These are plans, not currently implemented features.
+
+## Project layout
+
+```text
 Codebase-RAG-System/
-│
-├── data/
-│   ├── chunks.json
-│   └── chroma_db/
-│
-├── sample_repo/
-│
+├── data/                    # Persistent local index and repository state
 ├── src/
-│   ├── chunking/
-│   ├── embeddings/
-│   ├── ingestion/
-│   ├── parser/
-│   ├── retrieval/
-│   ├── storage/
-│   └── agents/
-│
-├── main.py
-├── test_embedding.py
-├── test_retrieval.py
-├── requirements.txt
+│   ├── api/                 # FastAPI application and schemas
+│   ├── chunking/            # AST-derived semantic chunks
+│   ├── embeddings/          # Sentence Transformers embeddings
+│   ├── generation/          # Context builder and Gemini client
+│   ├── indexing/            # Repository indexing workflow
+│   ├── ingestion/           # Python file discovery and reading
+│   ├── parser/              # Python AST parsing
+│   ├── rag/                 # End-to-end retrieval and generation pipeline
+│   ├── relationships/       # Import graph and graph expansion
+│   ├── retrieval/           # Vector and graph-aware retrieval
+│   ├── storage/             # ChromaDB persistence
+│   └── utils/               # Repository, state, and status utilities
+├── tests/                   # Unit, API, retrieval, graph, and benchmark code
+├── main.py                  # Command-line indexing entry point
+├── rag_pipeline_demo.py     # Interactive pipeline demo
+├── requirements.txt         # Runtime dependencies
+├── requirements-dev.txt     # Development and test dependencies
+├── pytest.ini               # Pytest discovery configuration
 └── README.md
+```
 
-## 🧩 Retrieval Architecture
+## Current limitations
 
-text
-retriever.py
-├── Query embedding
-├── ChromaDB vector search
-├── Similarity calculation
-├── Threshold filtering
-├── Structured result creation
-└── Retrieval latency measurement
-test_retrieval.py
-├── User input
-├── Calls the retrieval layer
-└── Displays results in the terminal
-
-The core retrieval logic is separated from testing and display logic, making it reusable for future backend APIs and RAG components.
-
-## 🛠️ Tech Stack
-
-- Python
-- Abstract Syntax Tree (AST)
-- Sentence Transformers
-- ChromaDB
-- JSON
-
-## 🚧 Current Progress
-
-- ✅ Repository Ingestion
-- ✅ AST Parsing
-- ✅ Semantic Code Chunking
-- ✅ Metadata Extraction
-- ✅ Embedding Generation
-- ✅ ChromaDB Vector Indexing
-- ✅ Stable Chunk IDs
-- ✅ Safe Re-indexing with `upsert()`
-- ✅ Semantic Code Retrieval
-- ✅ Top-K Vector Search
-- ✅ Similarity Scoring
-- ✅ Configurable Relevance Filtering
-- ✅ Structured Retrieval Results
-- ✅ Retrieval Latency Tracking
-- ⏳ Retrieval Evaluation
-- ⏳ RAG Context Construction
-- ⏳ LLM Integration
-- ⏳ FastAPI Backend
-- ⏳ Frontend
-- ⏳ Deployment
-
-## 🎯 Upcoming Features
-
-- Retrieval evaluation on larger repositories
-- RAG context construction
-- AI-powered codebase question answering
-- Grounded LLM responses using retrieved code
-- FastAPI backend
-- Interactive frontend
-- Agentic code analysis tools
-- Multi-language support
-- Deployment
-
-## 📚 Learning Goals
-
-This project is being built from scratch to understand the complete lifecycle of a production-minded Codebase RAG system:
-
-- AST Parsing
-- Semantic Code Chunking
-- Metadata Extraction
-- Embeddings
-- Vector Databases
-- Semantic Retrieval
-- Retrieval Evaluation
-- Retrieval-Augmented Generation (RAG)
-- Agentic AI
-- Backend API Design
-- Production-Ready System Design
-
-## 📌 Current Status
-
-The project currently has a working end-to-end code indexing and semantic retrieval pipeline:
-
-text
-Repository
-→ Parse
-→ Chunk
-→ Extract Metadata
-→ Embed
-→ Store
-→ Query
-→ Retrieve
-→ Score
-→ Filter
-→ Return Structured Results
-`
-
-The next major phase is to evaluate retrieval quality and use retrieved code chunks as grounded context for LLM-based codebase question answering.
-
-## 🤝 Contributing
-
-Suggestions and improvements are welcome. Feel free to open an issue or submit a pull request.
-
-## ⭐ Star the Repository
-
-If you find this project interesting, consider giving it a ⭐ to support the project.
+- The system currently indexes Python source files only.
+- ChromaDB, index state, repository registrations, and locks are stored locally under `data/`.
+- Gemini answer generation requires a configured API key and network access to the Google GenAI service.
+- The API has no authentication or authorization layer in the implemented code.
+- Indexing is performed as a background task, but no persistent job queue is implemented.
+- Graph-aware retrieval has not demonstrated a benefit in the current benchmark and is not part of the default query path.
+- No deployment configuration or hosted service URL is provided by this repository.
