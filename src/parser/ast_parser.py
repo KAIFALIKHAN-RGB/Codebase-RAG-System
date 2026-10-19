@@ -1,4 +1,8 @@
 import ast
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 def parse_code(code):
     """
@@ -7,6 +11,6 @@ def parse_code(code):
     try:
         tree = ast.parse(code)
         return tree
-    except SyntaxError as e:
-        print(f"Syntax error while parsing code: {e}")
+    except SyntaxError:
+        logger.warning("Unable to parse Python source because of a syntax error.")
         return None

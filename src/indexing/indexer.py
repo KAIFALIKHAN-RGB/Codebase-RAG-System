@@ -15,7 +15,11 @@ from src.utils.schema_version import (
 )
 from src.utils.repositories import save_repository
 from filelock import FileLock
+import logging
 import os
+
+
+logger = logging.getLogger(__name__)
 
 
 def _index_codebase(repo_path):
@@ -35,12 +39,11 @@ def _run_indexing(repo_path, repository_name):
     saved_version = load_schema_version()
 
     if saved_version != SCHEMA_VERSION:
-        print("=" * 60)
-        print("Schema version changed.")
-        print(f"Old Version : {saved_version}")
-        print(f"New Version : {SCHEMA_VERSION}")
-        print("Full re-index required.")
-        print("=" * 60)
+        logger.warning(
+            "Schema version changed from %s to %s; full re-index required.",
+            saved_version,
+            SCHEMA_VERSION,
+        )
 
         reset_database()
 
@@ -74,19 +77,17 @@ def _run_indexing(repo_path, repository_name):
 
         if old_state.get(file_key) == current_hash:
             unchanged_files_count += 1
-            print(f"Skipping unchanged file : {file}")
+            logger.debug("Skipping unchanged file: %s", file)
             continue
 
         if file_key in old_state:
             modified_files_count += 1
-            print(f"File modified, removing old chunks : {file}")
+            logger.debug("File modified; removing old chunks: %s", file)
             delete_chunks_by_file(repository_name, file_key)
         else:
             new_files_count += 1
 
-        print("=" * 50)
-        print(f"Reading : {file}")
-        print("=" * 50)
+        logger.debug("Reading: %s", file)
 
         code = read_python_file(file)
         tree = parse_code(code)
@@ -102,7 +103,7 @@ def _run_indexing(repo_path, repository_name):
 
     for deleted_file in deleted_files:
         deleted_files_count += 1
-        print(f"File deleted, removing old chunks : {deleted_file}")
+        logger.debug("File deleted; removing old chunks: %s", deleted_file)
         delete_chunks_by_file(repository_name, deleted_file)
 
     save_chunks(all_chunks, "data/chunks.json")
@@ -111,21 +112,22 @@ def _run_indexing(repo_path, repository_name):
         embedding = get_embedding(chunk["code"])
         store_chunk(chunk, embedding)
 
-    print(f"\nStored {len(all_chunks)} chunks in ChromaDB successfully.")
+    logger.info("Stored %s chunks in ChromaDB successfully.", len(all_chunks))
 
     save_repository_state(repository_name, new_state)
 
     save_repository(repository_name)
 
-    print("\n" + "=" * 50)
-    print("INDEXING SUMMARY")
-    print("=" * 50)
-    print(f"New files       : {new_files_count}")
-    print(f"Modified files  : {modified_files_count}")
-    print(f"Unchanged files : {unchanged_files_count}")
-    print(f"Deleted files   : {deleted_files_count}")
-    print(f"Chunks indexed  : {len(all_chunks)}")
-    print("=" * 50)
+    logger.info(
+        "Indexing summary for %s: new=%s modified=%s unchanged=%s "
+        "deleted=%s chunks=%s",
+        repository_name,
+        new_files_count,
+        modified_files_count,
+        unchanged_files_count,
+        deleted_files_count,
+        len(all_chunks),
+    )
 
 def index_codebase(repo_path):
         repository_name = os.path.basename(os.path.normpath(repo_path))
@@ -138,6 +140,7 @@ def index_codebase(repo_path):
 
         except Exception:
             set_index_status(repository_name, "failed")
+            logger.exception("Indexing failed for repository %s.", repository_name)
             raise
     
     
