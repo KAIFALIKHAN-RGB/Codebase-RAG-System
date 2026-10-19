@@ -154,6 +154,24 @@ def test_index_rejects_invalid_repository_path():
     assert response.json()["detail"] == "Invalid repository path."
 
 
+def test_index_rejects_existing_file_path_without_scheduling_task():
+    with (
+        patch("src.api.app.os.path.exists", return_value=True),
+        patch("src.api.app.os.path.isdir", return_value=False),
+        patch("src.api.app.save_repository_path") as mock_save_path,
+        patch("src.api.app.run_indexing_task") as mock_task,
+    ):
+        response = client.post(
+            "/index",
+            json={"repo_path": "C:/files/not_a_repository.txt"},
+        )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid repository path."
+    mock_save_path.assert_not_called()
+    mock_task.assert_not_called()
+
+
 def test_index_rejects_missing_repo_path():
     response = client.post("/index", json={})
 

@@ -101,7 +101,7 @@ class RepositoryListResponse(BaseModel):
 @app.post("/index", response_model=IndexResponse, status_code=202)
 async def index_repository(request: IndexRequest, background_tasks: BackgroundTasks):
   try:
-    if not os.path.exists(request.repo_path):
+    if not os.path.exists(request.repo_path) or not os.path.isdir(request.repo_path):
         raise HTTPException(status_code=400, detail="Invalid repository path.")
     
     repository_name = os.path.basename(os.path.normpath(request.repo_path))
