@@ -2,8 +2,12 @@ from src.ingestion.loader import load_python_file
 from src.ingestion.reader import read_python_file
 from src.parser.ast_parser import parse_code
 from src.chunking.chunker import extract_chunks
-from src.utils.storage import save_chunks
-from src.storage.chroma_store import (store_chunk, delete_chunks_by_file,reset_database)
+from src.utils.storage import repository_chunks_path, save_chunks
+from src.storage.chroma_store import (
+    delete_chunks_by_file,
+    reset_database_unlocked,
+    store_chunk,
+)
 from src.embeddings.embedder import get_embedding
 from src.utils.file_hash import get_hash_file
 from src.utils.index_state import (load_repository_state, save_repository_state)
@@ -14,7 +18,8 @@ from src.utils.schema_version import (
     save_schema_version,
 )
 from src.utils.repositories import save_repository
-from filelock import FileLock
+from src.utils.repository_lock import get_repository_lock
+from src.storage.storage_lock import storage_access
 import logging
 import os
 
@@ -24,38 +29,34 @@ logger = logging.getLogger(__name__)
 
 def _index_codebase(repo_path):
     repository_name = os.path.basename(os.path.normpath(repo_path))
-    lock_dir = "data/repository_locks"
-    os.makedirs(lock_dir, exist_ok=True)
-
-    lock_file = os.path.join(lock_dir, f"{repository_name}.lock")
-
-    with FileLock(lock_file):
+    with get_repository_lock(repository_name):
         return _run_indexing(repo_path, repository_name)
 
 def _run_indexing(repo_path, repository_name):
     
     files = load_python_file(repo_path)
 
-    saved_version = load_schema_version()
+    with storage_access():
+        saved_version = load_schema_version()
 
-    if saved_version != SCHEMA_VERSION:
-        logger.warning(
-            "Schema version changed from %s to %s; full re-index required.",
-            saved_version,
-            SCHEMA_VERSION,
-        )
+        if saved_version != SCHEMA_VERSION:
+            logger.warning(
+                "Schema version changed from %s to %s; full re-index required.",
+                saved_version,
+                SCHEMA_VERSION,
+            )
 
-        reset_database()
+            reset_database_unlocked()
 
-        if os.path.exists("data/index_state.json"):
-            os.remove("data/index_state.json")
+            if os.path.exists("data/index_state.json"):
+                os.remove("data/index_state.json")
 
-        if os.path.exists("data/file_hashes.json"):
-            os.remove("data/file_hashes.json")
+            if os.path.exists("data/file_hashes.json"):
+                os.remove("data/file_hashes.json")
 
-        old_state = {}
+            old_state = {}
 
-        save_schema_version()
+            save_schema_version()
 
 
     if saved_version == SCHEMA_VERSION:
@@ -106,7 +107,7 @@ def _run_indexing(repo_path, repository_name):
         logger.debug("File deleted; removing old chunks: %s", deleted_file)
         delete_chunks_by_file(repository_name, deleted_file)
 
-    save_chunks(all_chunks, "data/chunks.json")
+    save_chunks(all_chunks, repository_chunks_path(repository_name))
 
     for chunk in all_chunks:
         embedding = get_embedding(chunk["code"])
@@ -129,13 +130,16 @@ def _run_indexing(repo_path, repository_name):
         len(all_chunks),
     )
 
-def index_codebase(repo_path):
+def index_codebase(repo_path, *, acquire_lock=True):
         repository_name = os.path.basename(os.path.normpath(repo_path))
 
         set_index_status(repository_name, "indexing")
 
         try:
-            _index_codebase(repo_path)
+            if acquire_lock:
+                _index_codebase(repo_path)
+            else:
+                _run_indexing(repo_path, repository_name)
             set_index_status(repository_name, "completed")
 
         except Exception:

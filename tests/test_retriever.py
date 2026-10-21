@@ -1,4 +1,7 @@
 import src.retrieval.retriever as retriever
+from threading import Event, Thread
+
+from src.storage.storage_lock import storage_access
 
 
 def test_source_files_are_ranked_above_test_files():
@@ -44,6 +47,47 @@ def test_source_files_are_ranked_above_test_files():
 
     assert results[1]["similarity"] == 40.0
     assert results[1]["ranking_score"] == 37.0
+
+
+def test_query_waits_for_global_storage_access(monkeypatch):
+    entered = Event()
+    release = Event()
+    queried = Event()
+
+    class Collection:
+        def query(self, **kwargs):
+            queried.set()
+            return {
+                "documents": [[]],
+                "metadatas": [[]],
+                "distances": [[]],
+            }
+
+    fake_collection = Collection()
+    monkeypatch.setattr(retriever, "collection", fake_collection)
+    monkeypatch.setattr(retriever, "get_embedding", lambda query: [0.1])
+
+    def hold_storage():
+        with storage_access():
+            entered.set()
+            release.wait(timeout=2)
+
+    holder = Thread(target=hold_storage)
+    searcher = Thread(
+        target=retriever.search,
+        args=("query",),
+        kwargs={"threshold": 0},
+    )
+    holder.start()
+    assert entered.wait(timeout=2)
+    searcher.start()
+    assert not queried.wait(timeout=0.1)
+
+    release.set()
+    holder.join(timeout=2)
+    searcher.join(timeout=2)
+
+    assert queried.is_set()
 
 def test_repository_filter_isolated_with_source_test_ranking():
         retriever.get_embedding = lambda query: [0.1, 0.2, 0.3]

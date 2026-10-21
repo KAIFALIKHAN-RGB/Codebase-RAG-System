@@ -8,3 +8,7 @@ def set_index_status(repo_name, status):
 
 def get_index_status(repo_name):
     return index_status.get(repo_name, "not_found")
+
+
+def clear_index_status(repo_name):
+    index_status.pop(repo_name, None)

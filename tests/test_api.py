@@ -1,8 +1,13 @@
-from unittest.mock import patch
+import asyncio
+from threading import Event, Thread
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from src.api.app import get_repo_lock
+from src.api.app import get_repo_lock, health, run_indexing_task
+from src.utils.index_status import set_index_status
+from src.indexing import indexer
+from src.storage.storage_lock import storage_access
 
 from src.api.app import app
 
@@ -146,6 +151,36 @@ def test_health_returns_503_when_chromadb_fails():
     assert response.json()["detail"] == "ChromaDB unavailable."
 
 
+def test_health_count_waits_for_shared_storage_access():
+    entered = Event()
+    release = Event()
+    counted = Event()
+    collection = MagicMock()
+    collection.count.side_effect = lambda: counted.set()
+
+    async def call_health():
+        with patch("src.api.app.get_collection", return_value=collection):
+            await health()
+
+    def hold_storage():
+        with storage_access():
+            entered.set()
+            release.wait(timeout=2)
+
+    holder = Thread(target=hold_storage)
+    holder.start()
+    assert entered.wait(timeout=2)
+
+    health_thread = Thread(target=lambda: asyncio.run(call_health()))
+    health_thread.start()
+    assert not counted.wait(timeout=0.1)
+
+    release.set()
+    health_thread.join(timeout=2)
+    holder.join(timeout=2)
+    assert counted.is_set()
+
+
 def test_index_rejects_invalid_repository_path():
     with patch("src.api.app.os.path.exists", return_value=False):
         response = client.post(
@@ -213,6 +248,29 @@ def test_index_starts_background_task_for_valid_repository(tmp_path):
     assert response.json()["repositories"] == "sample_repo"
     mock_task.assert_called_once_with(str(repo_path), "sample_repo")
     mock_save_path.assert_called_once_with("sample_repo", str(repo_path))
+
+
+def test_index_rejects_duplicate_active_indexing(tmp_path):
+    repo_path = tmp_path / "sample_repo"
+    repo_path.mkdir()
+    set_index_status("sample_repo", "indexing")
+
+    try:
+        with (
+            patch("src.api.app.os.path.exists", return_value=True),
+            patch("src.api.app.os.path.isdir", return_value=True),
+            patch("src.api.app.save_repository_path") as mock_save_path,
+            patch("src.api.app.run_indexing_task") as mock_task,
+        ):
+            response = client.post("/index", json={"repo_path": str(repo_path)})
+    finally:
+        from src.utils.index_status import clear_index_status
+
+        clear_index_status("sample_repo")
+
+    assert response.status_code == 409
+    mock_save_path.assert_not_called()
+    mock_task.assert_not_called()
 
 
 def test_index_status_returns_status():
@@ -287,6 +345,8 @@ def test_delete_repository_success():
         patch("src.api.app.delete_repository_state") as mock_state,
         patch("src.api.app.delete_repository") as mock_repo,
         patch("src.api.app.delete_repository_path") as mock_path,
+        patch("src.api.app.get_index_status", return_value="completed"),
+        patch("src.api.app.clear_index_status") as mock_clear_status,
     ):
         response = client.delete("/repositories/sample_repo")
 
@@ -299,8 +359,74 @@ def test_delete_repository_success():
     mock_state.assert_called_once_with("sample_repo")
     mock_repo.assert_called_once_with("sample_repo")
     mock_path.assert_called_once_with("sample_repo")
+    mock_clear_status.assert_called_once_with("sample_repo")
 
 
+def test_delete_rejects_queued_indexing_and_preserves_status():
+    with (
+        patch("src.api.app.load_repositories", return_value=["sample_repo"]),
+        patch("src.api.app.get_index_status", return_value="queued"),
+        patch("src.api.app.delete_chunks_by_repository") as mock_chunks,
+    ):
+        response = client.delete("/repositories/sample_repo")
+
+    assert response.status_code == 409
+    mock_chunks.assert_not_called()
+
+
+def test_delete_rejects_newly_queued_repository_before_persistent_membership():
+    with (
+        patch("src.api.app.load_repositories", return_value=[]),
+        patch("src.api.app.get_index_status", return_value="queued"),
+        patch("src.api.app.delete_chunks_by_repository") as mock_chunks,
+    ):
+        response = client.delete("/repositories/sample_repo")
+
+    assert response.status_code == 409
+    mock_chunks.assert_not_called()
+
+
+def test_run_indexing_task_skips_deleted_queued_work(tmp_path):
+    from src.api.app import run_indexing_task
+
+    with (
+        patch("src.api.app.get_repo_lock"),
+        patch("src.api.app.get_index_status", return_value="not_found"),
+        patch("src.api.app.index_codebase") as mock_index,
+    ):
+        run_indexing_task(str(tmp_path), "sample_repo")
+
+    mock_index.assert_not_called()
+
+
+def test_run_indexing_task_does_not_restore_failed_after_deletion(
+    tmp_path,
+    monkeypatch,
+):
+    statuses = {"sample_repo": "queued"}
+    lock = MagicMock()
+
+    def get_status(repo_name):
+        return statuses.get(repo_name, "not_found")
+
+    def set_status(repo_name, status):
+        statuses[repo_name] = status
+
+    def delete_during_indexing(*args, **kwargs):
+        statuses.pop("sample_repo", None)
+        raise RuntimeError("index failed")
+
+    monkeypatch.setattr("src.api.app.get_repo_lock", lambda name: lock)
+    monkeypatch.setattr("src.api.app.get_index_status", get_status)
+    monkeypatch.setattr("src.api.app.set_index_status", set_status)
+    monkeypatch.setattr(
+        "src.api.app.index_codebase",
+        delete_during_indexing,
+    )
+
+    run_indexing_task(str(tmp_path), "sample_repo")
+
+    assert statuses == {}
 def test_delete_repository_returns_500_on_failure():
     with (
         patch(
@@ -325,6 +451,11 @@ def test_delete_repository_returns_500_on_failure():
 def test_get_repo_lock_rejects_invalid_repository_name(repo_name):
     with pytest.raises(ValueError, match="Invalid repository name"):
         get_repo_lock(repo_name)
+
+
+def test_api_and_indexer_use_the_same_repository_lock_helper():
+    assert get_repo_lock is indexer.get_repository_lock
+
 
 def test_query_rejects_query_longer_than_max_length():
     response = client.post(

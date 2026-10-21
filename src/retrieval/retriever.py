@@ -3,13 +3,30 @@ import re
 import chromadb
 
 from src.embeddings.embedder import get_embedding
+from src.storage import chroma_store
+from src.storage.storage_lock import storage_access
 
 
 # Connect to the persistent ChromaDB database
-client = chromadb.PersistentClient(path="data/chroma_db")
+with storage_access():
+    client = chromadb.PersistentClient(path="data/chroma_db")
 
-# Load the existing code chunks collection
-collection = client.get_collection("code_chunks")
+    # Load the existing code chunks collection
+    collection = client.get_collection("code_chunks")
+_managed_collection = collection
+_managed_generation = chroma_store.get_storage_generation()
+_managed_query = collection.query
+
+
+def _invalidate_storage_handles():
+    global client, collection
+
+    client = None
+    collection = None
+
+
+chroma_store.register_reset_callback(_invalidate_storage_handles)
+
 
 def _normalize_word(word):
     word = word.lower()
@@ -51,6 +68,9 @@ def _normalize_word(word):
 
 
 def search(query, repository=None, k=3, threshold=35.0, file_paths=None):
+    global client, collection, _managed_collection
+    global _managed_generation, _managed_query
+
     """
     Search the codebase for the most relevant code chunks.
 
@@ -110,11 +130,28 @@ def search(query, repository=None, k=3, threshold=35.0, file_paths=None):
     candidate_count = max(k * 10, 50)
 
     # Retrieve a larger candidate pool from ChromaDB
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=candidate_count,
-        where=where_filter
-    )
+    with storage_access():
+        active_collection = collection
+        if (
+            collection is None
+            or (
+            collection is _managed_collection
+            and _managed_generation != chroma_store.get_storage_generation()
+            and getattr(collection.query, "__func__", collection.query)
+            is getattr(_managed_query, "__func__", _managed_query)
+            )
+        ):
+            active_collection = chroma_store.get_collection_unlocked()
+            client = chroma_store.client
+            collection = active_collection
+            _managed_collection = active_collection
+            _managed_generation = chroma_store.get_storage_generation()
+            _managed_query = active_collection.query
+        results = active_collection.query(
+            query_embeddings=[query_embedding],
+            n_results=candidate_count,
+            where=where_filter
+        )
 
     relevant_results = []
     seen_chunks = set()

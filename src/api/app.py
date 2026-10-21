@@ -5,26 +5,17 @@ from pydantic import BaseModel, Field, field_validator
 from src.indexing.indexer import index_codebase
 from src.utils.repositories import load_repositories, delete_repository
 from src.storage.chroma_store import get_collection, delete_chunks_by_repository
-from src.utils.index_status import set_index_status, get_index_status
+from src.utils.index_status import (
+    clear_index_status,
+    get_index_status,
+    set_index_status,
+)
 from src.utils.index_state import delete_repository_state
-from filelock import FileLock
 from src.utils.repository_paths import save_repository_path, delete_repository_path
+from src.utils.repository_lock import get_repository_lock
+from src.storage.storage_lock import storage_access
 
-def get_repo_lock(repo_name):
-    if (
-        not repo_name
-        or repo_name in {".", ".."}
-        or os.path.basename(repo_name) != repo_name
-        or "/" in repo_name
-        or "\\" in repo_name
-    ):
-        raise ValueError("Invalid repository name.")
-
-    lock_file = os.path.join(LOCK_DIR, f"{repo_name}.lock")
-    return FileLock(lock_file)
-
-LOCK_DIR = "data/repo_locks"
-os.makedirs(LOCK_DIR, exist_ok=True)
+get_repo_lock = get_repository_lock
 
 app = FastAPI(title = "Codebase RAG API", version = "1.0.0")
 
@@ -35,8 +26,9 @@ async def root():
 @app.get("/health")
 async def health():
     try:
-        collection = get_collection()
-        collection.count()
+        with storage_access():
+            collection = get_collection()
+            collection.count()
 
         return {
             "status": "healthy",
@@ -86,14 +78,18 @@ async def query_rag(request: QueryRequest):
 def run_indexing_task(repo_path, repo_name):
     try:
         with get_repo_lock(repo_name):  
+          if get_index_status(repo_name) != "queued":
+              return
           set_index_status(repo_name, "indexing")
 
-          index_codebase(repo_path)
+          index_codebase(repo_path, acquire_lock=False)
 
           set_index_status(repo_name, "completed")
 
     except Exception:
-          set_index_status(repo_name, "failed")
+          with get_repo_lock(repo_name):
+              if get_index_status(repo_name) != "not_found":
+                  set_index_status(repo_name, "failed")
 
 class IndexRequest(BaseModel):
   repo_path : str
@@ -117,8 +113,19 @@ async def index_repository(request: IndexRequest, background_tasks: BackgroundTa
         raise HTTPException(status_code=400, detail="Invalid repository path.")
     
     repository_name = os.path.basename(os.path.normpath(request.repo_path))
-    save_repository_path(repository_name, request.repo_path)
-    background_tasks.add_task(run_indexing_task, request.repo_path, repository_name)
+    with get_repo_lock(repository_name):
+        if get_index_status(repository_name) in {"queued", "indexing"}:
+            raise HTTPException(
+                status_code=409,
+                detail="Repository indexing is already in progress.",
+            )
+        save_repository_path(repository_name, request.repo_path)
+        set_index_status(repository_name, "queued")
+        background_tasks.add_task(
+            run_indexing_task,
+            request.repo_path,
+            repository_name,
+        )
     return {"success": True, "repositories": repository_name, "message": "Repository indexing started."}
 
   except HTTPException:
@@ -162,27 +169,33 @@ async def get_repositories():
 
 @app.delete("/repositories/{repo_name}")
 async def remove_repository(repo_name: str):
-    repos = load_repositories()
-
-    if repo_name not in repos:
-        raise HTTPException(
-            status_code=404,
-            detail="Repository not found."
-        )
-
     try:
         with get_repo_lock(repo_name):
+            if get_index_status(repo_name) in {"queued", "indexing"}:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Repository indexing is in progress.",
+                )
+            if repo_name not in load_repositories():
+                raise HTTPException(
+                    status_code=404,
+                    detail="Repository not found."
+                )
             delete_chunks_by_repository(repo_name)
             delete_repository_state(repo_name)
             delete_repository(repo_name)
             delete_repository_path(repo_name)
+            clear_index_status(repo_name)
 
         return {
             "success": True,
             "message": f"Repository '{repo_name}' deleted successfully."
         }
 
-    except Exception as e:
+    except HTTPException:
+        raise
+
+    except Exception:
         raise HTTPException(
             status_code=500,
             detail="Failed to delete repository."
